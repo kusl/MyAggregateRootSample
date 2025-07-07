@@ -4,13 +4,14 @@ namespace MyClassLibrary;
 // Application Service interacts only with the Aggregate Root Repository
 public class MyApplicationService(
     ICustomerAggregateRepository customerRepository,
+    CustomerBusinessRules rules,
     ILogger<MyApplicationService> logger,
     ILogger<CustomerAggregateRoot> customerLogger)
 {
     public void CreateCustomerAndPlaceOrder(string customerName, List<(string product, int quantity, decimal price)> orderItemsData)
     {
         // Pass the specific CustomerAggregateRoot logger
-        CustomerAggregateRoot customer = new(Guid.NewGuid(), customerName, customerLogger);
+        CustomerAggregateRoot customer = new(Guid.NewGuid(), customerName, customerLogger, rules);
         Order order = customer.PlaceNewOrder(); // Order creation goes through the aggregate
 
         foreach ((string product, int quantity, decimal price) in orderItemsData)
