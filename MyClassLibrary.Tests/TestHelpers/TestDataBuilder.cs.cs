@@ -21,7 +21,7 @@ public static class TestDataBuilder
 
     public static List<(string product, int quantity, decimal price)> CreateOrderItems(int count = 3)
     {
-        var items = new List<(string product, int quantity, decimal price)>();
+        List<(string product, int quantity, decimal price)> items = [];
         for (int i = 1; i <= count; i++)
         {
             items.Add(($"Product {i}", i, i * 10.50m));

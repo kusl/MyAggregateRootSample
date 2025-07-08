@@ -17,15 +17,15 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersAllRequiredServices()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
 
         // Add required logging services
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Check all services are registered
         Assert.NotNull(serviceProvider.GetService<CustomerBusinessRules>());
@@ -38,19 +38,19 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersCorrectImplementations()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Check correct implementations
-        var repository = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository = serviceProvider.GetService<ICustomerAggregateRepository>();
         Assert.IsType<InMemoryCustomerAggregateRepository>(repository);
 
-        var eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
         Assert.IsType<LoggingDomainEventDispatcher>(eventDispatcher);
     }
 
@@ -58,23 +58,23 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_ConfiguresBusinessRulesFromConfiguration()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configValues = new Dictionary<string, string?>
+        ServiceCollection services = new();
+        Dictionary<string, string?> configValues = new()
         {
             {"CustomerBusinessRules:MaxOutstandingOrders", "5"},
             {"CustomerBusinessRules:OutstandingOrderDays", "45"}
         };
-        var configuration = new ConfigurationBuilder()
+        IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configValues)
             .Build();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        var businessRules = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.NotNull(businessRules);
         Assert.Equal(5, businessRules.MaxOutstandingOrders);
         Assert.Equal(45, businessRules.OutstandingOrderDays);
@@ -84,25 +84,25 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersSingletonServices()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Verify singleton behavior
-        var businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
-        var businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.Same(businessRules1, businessRules2);
 
-        var repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
-        var repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
         Assert.Same(repository1, repository2);
 
-        var dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
-        var dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
         Assert.Same(dispatcher1, dispatcher2);
     }
 
@@ -110,17 +110,17 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersTransientApplicationService()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Verify transient behavior
-        var service1 = serviceProvider.GetService<CustomerApplicationService>();
-        var service2 = serviceProvider.GetService<CustomerApplicationService>();
+        CustomerApplicationService? service1 = serviceProvider.GetService<CustomerApplicationService>();
+        CustomerApplicationService? service2 = serviceProvider.GetService<CustomerApplicationService>();
         Assert.NotSame(service1, service2);
     }
 
@@ -128,16 +128,16 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_CanResolveAllDependenciesForApplicationService()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - This will throw if any dependencies are missing
-        var applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
+        CustomerApplicationService applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
         Assert.NotNull(applicationService);
     }
 
@@ -145,16 +145,16 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_DefaultBusinessRulesWhenNotInConfiguration()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = new ConfigurationBuilder().Build(); // Empty configuration
+        ServiceCollection services = new();
+        IConfigurationRoot configuration = new ConfigurationBuilder().Build(); // Empty configuration
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        var businessRules = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.NotNull(businessRules);
         Assert.Equal(10, businessRules.MaxOutstandingOrders); // Default value
         Assert.Equal(30, businessRules.OutstandingOrderDays); // Default value
@@ -162,7 +162,7 @@ public class ServiceCollectionExtensionsTests
 
     private static IConfiguration CreateConfiguration()
     {
-        var configValues = new Dictionary<string, string?>
+        Dictionary<string, string?> configValues = new()
         {
             {"CustomerBusinessRules:MaxOutstandingOrders", "10"},
             {"CustomerBusinessRules:OutstandingOrderDays", "30"}

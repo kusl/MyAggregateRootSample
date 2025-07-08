@@ -5,9 +5,9 @@ namespace MyClassLibrary.Tests.TestHelpers;
 
 public class MockLogger<T> : ILogger<T>
 {
-    private readonly ConcurrentBag<LogEntry> _logEntries = new();
+    private readonly ConcurrentBag<LogEntry> _logEntries = [];
 
-    public IReadOnlyList<LogEntry> LogEntries => _logEntries.ToList();
+    public IReadOnlyList<LogEntry> LogEntries => [.. _logEntries];
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {

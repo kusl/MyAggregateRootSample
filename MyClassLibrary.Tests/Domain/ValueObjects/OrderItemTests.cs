@@ -14,7 +14,7 @@ public class OrderItemTests
         const decimal price = 10.50m;
 
         // Act
-        var orderItem = new OrderItem(product, quantity, price);
+        OrderItem orderItem = new(product, quantity, price);
 
         // Assert
         Assert.Equal(product, orderItem.Product);
@@ -30,7 +30,7 @@ public class OrderItemTests
     public void Constructor_InvalidProduct_ThrowsArgumentException(string? product)
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new OrderItem(product!, 1, 10.00m));
         Assert.Contains("Product cannot be null or empty", exception.Message);
     }
@@ -42,7 +42,7 @@ public class OrderItemTests
     public void Constructor_InvalidQuantity_ThrowsArgumentException(int quantity)
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new OrderItem("Product", quantity, 10.00m));
         Assert.Contains("Quantity must be positive", exception.Message);
     }
@@ -54,7 +54,7 @@ public class OrderItemTests
     public void Constructor_InvalidPrice_ThrowsArgumentException(decimal price)
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new OrderItem("Product", 1, price));
         Assert.Contains("Price must be positive", exception.Message);
     }
@@ -66,7 +66,7 @@ public class OrderItemTests
         const string productWithSpaces = "  Test Product  ";
 
         // Act
-        var orderItem = new OrderItem(productWithSpaces, 1, 10.00m);
+        OrderItem orderItem = new(productWithSpaces, 1, 10.00m);
 
         // Assert
         Assert.Equal("Test Product", orderItem.Product);
@@ -76,18 +76,18 @@ public class OrderItemTests
     public void LineTotal_CalculatesCorrectly()
     {
         // Arrange
-        var testCases = new[]
-        {
+        (int quantity, decimal price, decimal expected)[] testCases =
+        [
             (quantity: 1, price: 10.00m, expected: 10.00m),
             (quantity: 5, price: 15.50m, expected: 77.50m),
             (quantity: 100, price: 0.99m, expected: 99.00m),
             (quantity: 3, price: 33.33m, expected: 99.99m)
-        };
+        ];
 
-        foreach (var (quantity, price, expected) in testCases)
+        foreach ((int quantity, decimal price, decimal expected) in testCases)
         {
             // Act
-            var orderItem = new OrderItem("Product", quantity, price);
+            OrderItem orderItem = new("Product", quantity, price);
 
             // Assert
             Assert.Equal(expected, orderItem.LineTotal);
@@ -98,9 +98,9 @@ public class OrderItemTests
     public void OrderItem_RecordEquality_WorksCorrectly()
     {
         // Arrange
-        var item1 = new OrderItem("Product", 5, 10.00m);
-        var item2 = new OrderItem("Product", 5, 10.00m);
-        var item3 = new OrderItem("Product", 3, 10.00m);
+        OrderItem item1 = new("Product", 5, 10.00m);
+        OrderItem item2 = new("Product", 5, 10.00m);
+        OrderItem item3 = new("Product", 3, 10.00m);
 
         // Act & Assert
         Assert.Equal(item1, item2);

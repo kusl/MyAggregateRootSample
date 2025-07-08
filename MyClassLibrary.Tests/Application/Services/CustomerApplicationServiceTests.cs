@@ -104,22 +104,22 @@ public class CustomerApplicationServiceTests
     {
         // Arrange
         const string customerName = "John Doe";
-        var orderItems = TestDataBuilder.CreateOrderItems(3);
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems(3);
 
         // Act
-        var customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, orderItems);
+        Guid customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, orderItems);
 
         // Assert
         Assert.NotEqual(Guid.Empty, customerId);
         Assert.Single(_mockRepository.SavedCustomers);
 
-        var savedCustomer = _mockRepository.SavedCustomers.First();
+        CustomerAggregateRoot savedCustomer = _mockRepository.SavedCustomers.First();
         Assert.Equal(customerId, savedCustomer.Id);
         Assert.Equal(customerName, savedCustomer.Name);
         Assert.Single(savedCustomer.Orders);
         Assert.Equal(3, savedCustomer.Orders[0].Items.Count);
 
-        Assert.True(_mockEventDispatcher.DispatchedEvents.Any());
+        Assert.NotEmpty(_mockEventDispatcher.DispatchedEvents);
         Assert.True(_mockServiceLogger.ContainsMessage($"Successfully created customer {customerName}", LogLevel.Information));
     }
 
@@ -128,14 +128,14 @@ public class CustomerApplicationServiceTests
     {
         // Arrange
         const string customerName = "Jane Doe";
-        var emptyOrderItems = new List<(string product, int quantity, decimal price)>();
+        List<(string product, int quantity, decimal price)> emptyOrderItems = [];
 
         // Act
-        var customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, emptyOrderItems);
+        Guid customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, emptyOrderItems);
 
         // Assert
         Assert.NotEqual(Guid.Empty, customerId);
-        var savedCustomer = _mockRepository.SavedCustomers.First();
+        CustomerAggregateRoot savedCustomer = _mockRepository.SavedCustomers.First();
         Assert.Single(savedCustomer.Orders);
         Assert.Empty(savedCustomer.Orders[0].Items);
     }
@@ -145,7 +145,7 @@ public class CustomerApplicationServiceTests
     {
         // Arrange
         const string customerName = "Error Customer";
-        var orderItems = TestDataBuilder.CreateOrderItems();
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems();
         _mockRepository.ThrowOnSave = true;
 
         // Act & Assert
@@ -159,18 +159,18 @@ public class CustomerApplicationServiceTests
     public async Task AddOrderItemsToExistingOrderAsync_Success_AddsItems()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
-        var order = customer.PlaceNewOrder();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        MyClassLibrary.Domain.Entities.Order order = customer.PlaceNewOrder();
         _mockRepository.AddCustomer(customer);
 
-        var newItems = TestDataBuilder.CreateOrderItems(2);
+        List<(string product, int quantity, decimal price)> newItems = TestDataBuilder.CreateOrderItems(2);
 
         // Act
         await _service.AddOrderItemsToExistingOrderAsync(customer.Id, order.Id, newItems);
 
         // Assert
         Assert.Equal(2, _mockRepository.SavedCustomers.Count); // Original + updated
-        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        CustomerAggregateRoot updatedCustomer = _mockRepository.SavedCustomers.Last();
         Assert.Equal(2, updatedCustomer.Orders[0].Items.Count);
         Assert.True(_mockServiceLogger.ContainsMessage($"Successfully added items to order {order.Id}", LogLevel.Information));
     }
@@ -179,12 +179,12 @@ public class CustomerApplicationServiceTests
     public async Task AddOrderItemsToExistingOrderAsync_CustomerNotFound_ThrowsInvalidOperationException()
     {
         // Arrange
-        var nonExistentCustomerId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        var items = TestDataBuilder.CreateOrderItems();
+        Guid nonExistentCustomerId = Guid.NewGuid();
+        Guid orderId = Guid.NewGuid();
+        List<(string product, int quantity, decimal price)> items = TestDataBuilder.CreateOrderItems();
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _service.AddOrderItemsToExistingOrderAsync(nonExistentCustomerId, orderId, items));
 
         Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
@@ -195,12 +195,12 @@ public class CustomerApplicationServiceTests
     public async Task AddOrderItemsToExistingOrderAsync_Exception_LogsErrorAndRethrows()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
-        var order = customer.PlaceNewOrder();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        MyClassLibrary.Domain.Entities.Order order = customer.PlaceNewOrder();
         _mockRepository.AddCustomer(customer);
 
-        var nonExistentOrderId = Guid.NewGuid();
-        var items = TestDataBuilder.CreateOrderItems();
+        Guid nonExistentOrderId = Guid.NewGuid();
+        List<(string product, int quantity, decimal price)> items = TestDataBuilder.CreateOrderItems();
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -214,14 +214,14 @@ public class CustomerApplicationServiceTests
     {
         // Arrange
         const string customerName = "Event Test Customer";
-        var orderItems = TestDataBuilder.CreateOrderItems(1);
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems(1);
 
         // Act
         await _service.CreateCustomerAndPlaceOrderAsync(customerName, orderItems);
 
         // Assert
         Assert.NotEmpty(_mockEventDispatcher.DispatchedEvents);
-        var eventTypes = _mockEventDispatcher.DispatchedEvents.Select(e => e.GetType()).ToList();
+        List<Type> eventTypes = [.. _mockEventDispatcher.DispatchedEvents.Select(e => e.GetType())];
         Assert.Contains(typeof(CustomerCreatedEvent), eventTypes);
         Assert.Contains(typeof(OrderPlacedEvent), eventTypes);
         Assert.Contains(typeof(OrderItemAddedEvent), eventTypes);
@@ -230,13 +230,13 @@ public class CustomerApplicationServiceTests
     // Mock implementations for testing
     private class MockCustomerRepository : ICustomerAggregateRepository
     {
-        public List<CustomerAggregateRoot> SavedCustomers { get; } = new();
-        private readonly Dictionary<Guid, CustomerAggregateRoot> _customers = new();
+        public List<CustomerAggregateRoot> SavedCustomers { get; } = [];
+        private readonly Dictionary<Guid, CustomerAggregateRoot> _customers = [];
         public bool ThrowOnSave { get; set; }
 
         public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            _customers.TryGetValue(id, out var customer);
+            _customers.TryGetValue(id, out CustomerAggregateRoot? customer);
             return Task.FromResult(customer);
         }
 
@@ -259,7 +259,7 @@ public class CustomerApplicationServiceTests
 
     private class MockDomainEventDispatcher : IDomainEventDispatcher
     {
-        public List<DomainEvent> DispatchedEvents { get; } = new();
+        public List<DomainEvent> DispatchedEvents { get; } = [];
 
         public Task DispatchAsync(IEnumerable<DomainEvent> events, CancellationToken cancellationToken = default)
         {

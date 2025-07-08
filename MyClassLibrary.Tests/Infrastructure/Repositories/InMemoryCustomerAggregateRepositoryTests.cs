@@ -28,10 +28,10 @@ public class InMemoryCustomerAggregateRepositoryTests
     public async Task GetByIdAsync_NonExistentCustomer_ReturnsNull()
     {
         // Arrange
-        var customerId = Guid.NewGuid();
+        Guid customerId = Guid.NewGuid();
 
         // Act
-        var result = await _repository.GetByIdAsync(customerId);
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? result = await _repository.GetByIdAsync(customerId);
 
         // Assert
         Assert.Null(result);
@@ -42,7 +42,7 @@ public class InMemoryCustomerAggregateRepositoryTests
     public async Task SaveAsync_NewCustomer_SavesSuccessfully()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer("John Doe");
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("John Doe");
 
         // Act
         await _repository.SaveAsync(customer);
@@ -65,12 +65,12 @@ public class InMemoryCustomerAggregateRepositoryTests
     public async Task GetByIdAsync_AfterSave_ReturnsCustomer()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer("Jane Doe");
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("Jane Doe");
         await _repository.SaveAsync(customer);
         _mockLogger.Clear();
 
         // Act
-        var retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
 
         // Assert
         Assert.NotNull(retrievedCustomer);
@@ -83,7 +83,7 @@ public class InMemoryCustomerAggregateRepositoryTests
     public async Task SaveAsync_ExistingCustomer_UpdatesSuccessfully()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer("Initial Name");
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("Initial Name");
         await _repository.SaveAsync(customer);
 
         // Modify the customer (add an order)
@@ -97,7 +97,7 @@ public class InMemoryCustomerAggregateRepositoryTests
         Assert.True(_mockLogger.ContainsMessage("Updated customer aggregate", LogLevel.Information));
 
         // Verify the update persisted
-        var retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
         Assert.NotNull(retrievedCustomer);
         Assert.Single(retrievedCustomer.Orders);
     }
@@ -106,15 +106,15 @@ public class InMemoryCustomerAggregateRepositoryTests
     public async Task Repository_IsolatedBetweenInstances()
     {
         // Arrange
-        var repository1 = new InMemoryCustomerAggregateRepository(new MockLogger<InMemoryCustomerAggregateRepository>());
-        var repository2 = new InMemoryCustomerAggregateRepository(new MockLogger<InMemoryCustomerAggregateRepository>());
+        InMemoryCustomerAggregateRepository repository1 = new(new MockLogger<InMemoryCustomerAggregateRepository>());
+        InMemoryCustomerAggregateRepository repository2 = new(new MockLogger<InMemoryCustomerAggregateRepository>());
 
-        var customer = TestDataBuilder.CreateCustomer("Test Customer");
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("Test Customer");
 
         // Act
         await repository1.SaveAsync(customer);
-        var result1 = await repository1.GetByIdAsync(customer.Id);
-        var result2 = await repository2.GetByIdAsync(customer.Id);
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? result1 = await repository1.GetByIdAsync(customer.Id);
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? result2 = await repository2.GetByIdAsync(customer.Id);
 
         // Assert - Both repositories share the same static storage
         Assert.NotNull(result1);
@@ -127,23 +127,23 @@ public class InMemoryCustomerAggregateRepositoryTests
     public async Task SaveAsync_MultipleCustomers_SavesAll()
     {
         // Arrange
-        var customers = new[]
-        {
+        MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot[] customers =
+        [
             TestDataBuilder.CreateCustomer("Customer 1"),
             TestDataBuilder.CreateCustomer("Customer 2"),
             TestDataBuilder.CreateCustomer("Customer 3")
-        };
+        ];
 
         // Act
-        foreach (var customer in customers)
+        foreach (MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? customer in customers)
         {
             await _repository.SaveAsync(customer);
         }
 
         // Assert
-        foreach (var customer in customers)
+        foreach (MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? customer in customers)
         {
-            var retrieved = await _repository.GetByIdAsync(customer.Id);
+            MyClassLibrary.Domain.Aggregates.CustomerAggregateRoot? retrieved = await _repository.GetByIdAsync(customer.Id);
             Assert.NotNull(retrieved);
             Assert.Equal(customer.Name, retrieved.Name);
         }
