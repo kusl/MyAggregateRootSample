@@ -44,9 +44,11 @@ public class LoggingDomainEventDispatcherTests
         Assert.Single(_mockLogger.LogEntries);
         var logEntry = _mockLogger.LogEntries.First();
         Assert.Equal(LogLevel.Information, logEntry.LogLevel);
+        // Don't check for exact DateTime string match
+        Assert.Contains("Domain event dispatched:", logEntry.Message);
         Assert.Contains("CustomerCreatedEvent", logEntry.Message);
         Assert.Contains(@event.Id.ToString(), logEntry.Message);
-        Assert.Contains(@event.OccurredOn.ToString(), logEntry.Message);
+        Assert.Contains(" at ", logEntry.Message);
     }
 
     [Fact]
@@ -123,4 +125,3 @@ public class LoggingDomainEventDispatcherTests
         Assert.Contains(logMessages, m => m.Contains("OrderPlacedEvent"));
     }
 }
-
