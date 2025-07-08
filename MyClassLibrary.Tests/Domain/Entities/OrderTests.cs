@@ -11,11 +11,11 @@ public class OrderTests
     public void Constructor_ValidParameters_CreatesOrder()
     {
         // Arrange
-        Guid orderId = Guid.NewGuid();
-        DateTime orderDate = DateTime.UtcNow.AddDays(-1);
+        var orderId = Guid.NewGuid();
+        var orderDate = DateTime.UtcNow.AddDays(-1);
 
         // Act
-        Order order = new(orderId, orderDate);
+        var order = new Order(orderId, orderDate);
 
         // Assert
         Assert.Equal(orderId, order.Id);
@@ -28,7 +28,7 @@ public class OrderTests
     public void Constructor_EmptyId_ThrowsArgumentException()
     {
         // Act & Assert
-        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+        var exception = Assert.Throws<ArgumentException>(() =>
             new Order(Guid.Empty, DateTime.UtcNow));
         Assert.Contains("Order ID cannot be empty", exception.Message);
     }
@@ -37,7 +37,7 @@ public class OrderTests
     public void Constructor_FutureDate_ThrowsArgumentException()
     {
         // Act & Assert
-        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+        var exception = Assert.Throws<ArgumentException>(() =>
             new Order(Guid.NewGuid(), DateTime.UtcNow.AddDays(1)));
         Assert.Contains("Order date cannot be in the future", exception.Message);
     }
@@ -46,8 +46,8 @@ public class OrderTests
     public void AddItem_ValidItem_AddsToOrder()
     {
         // Arrange
-        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
-        OrderItem item = TestDataBuilder.CreateOrderItem("Product 1", 2, 15.00m);
+        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
+        var item = TestDataBuilder.CreateOrderItem("Product 1", 2, 15.00m);
 
         // Act
         order.AddItem(item);
@@ -62,7 +62,7 @@ public class OrderTests
     public void AddItem_NullItem_ThrowsArgumentNullException()
     {
         // Arrange
-        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
+        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => order.AddItem(null!));
@@ -72,9 +72,9 @@ public class OrderTests
     public void AddItem_DuplicateItem_CombinesQuantities()
     {
         // Arrange
-        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
-        OrderItem item1 = new("Product A", 2, 10.00m);
-        OrderItem item2 = new("Product A", 3, 10.00m);
+        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
+        var item1 = new OrderItem("Product A", 2, 10.00m);
+        var item2 = new OrderItem("Product A", 3, 10.00m);
 
         // Act
         order.AddItem(item1);
@@ -92,9 +92,9 @@ public class OrderTests
     public void AddItem_SameProductDifferentPrice_DoesNotCombine()
     {
         // Arrange
-        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
-        OrderItem item1 = new("Product A", 2, 10.00m);
-        OrderItem item2 = new("Product A", 3, 15.00m);
+        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
+        var item1 = new OrderItem("Product A", 2, 10.00m);
+        var item2 = new OrderItem("Product A", 3, 15.00m);
 
         // Act
         order.AddItem(item1);
@@ -109,16 +109,16 @@ public class OrderTests
     public void TotalAmount_MultipleItems_CalculatesCorrectly()
     {
         // Arrange
-        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
-        OrderItem[] items =
-        [
+        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1));
+        var items = new[]
+        {
             new OrderItem("Product 1", 2, 10.00m),
             new OrderItem("Product 2", 1, 15.50m),
             new OrderItem("Product 3", 3, 7.25m)
-        ];
+        };
 
         // Act
-        foreach (OrderItem? item in items)
+        foreach (var item in items)
         {
             order.AddItem(item);
         }
@@ -128,24 +128,23 @@ public class OrderTests
     }
 
     [Theory]
-    [InlineData(0, false)]
-    [InlineData(10, false)]
-    [InlineData(29, false)]
-    [InlineData(30, true)]
-    [InlineData(31, true)]
-    [InlineData(100, true)]
+    [InlineData(0, true)]     // Order from today is outstanding
+    [InlineData(10, true)]    // 10 days ago - still within 30 days
+    [InlineData(29, true)]    // 29 days ago - still within 30 days
+    [InlineData(30, false)]   // 30 days ago - no longer outstanding
+    [InlineData(31, false)]   // 31 days ago - no longer outstanding
+    [InlineData(100, false)]  // 100 days ago - no longer outstanding
     public void IsOutstanding_VariousDays_ReturnsCorrectResult(int daysAgo, bool expectedOutstanding)
     {
         // Arrange
-        DateTime orderDate = DateTime.UtcNow.AddDays(-daysAgo);
-        Order order = new(Guid.NewGuid(), orderDate);
+        var orderDate = DateTime.UtcNow.AddDays(-daysAgo);
+        var order = new Order(Guid.NewGuid(), orderDate);
         const int outstandingDays = 30;
 
         // Act
-        bool isOutstanding = order.IsOutstanding(outstandingDays);
+        var isOutstanding = order.IsOutstanding(outstandingDays);
 
         // Assert
         Assert.Equal(expectedOutstanding, isOutstanding);
     }
 }
-
