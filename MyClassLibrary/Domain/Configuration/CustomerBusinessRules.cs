@@ -1,4 +1,5 @@
-﻿namespace MyClassLibrary;
+﻿namespace MyClassLibrary.Domain.Configuration;
+
 public class CustomerBusinessRules
 {
     public int MaxOutstandingOrders { get; set; } = 10;
