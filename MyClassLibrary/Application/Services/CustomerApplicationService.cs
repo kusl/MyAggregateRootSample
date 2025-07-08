@@ -6,27 +6,18 @@ using MyClassLibrary.Domain.Configuration;
 
 namespace MyClassLibrary.Application.Services;
 
-public class CustomerApplicationService
+public class CustomerApplicationService(
+    ICustomerAggregateRepository customerRepository,
+    IDomainEventDispatcher eventDispatcher,
+    CustomerBusinessRules businessRules,
+    ILogger<CustomerApplicationService> logger,
+    ILogger<CustomerAggregateRoot> customerLogger)
 {
-    private readonly ICustomerAggregateRepository _customerRepository;
-    private readonly IDomainEventDispatcher _eventDispatcher;
-    private readonly CustomerBusinessRules _businessRules;
-    private readonly ILogger<CustomerApplicationService> _logger;
-    private readonly ILogger<CustomerAggregateRoot> _customerLogger;
-
-    public CustomerApplicationService(
-        ICustomerAggregateRepository customerRepository,
-        IDomainEventDispatcher eventDispatcher,
-        CustomerBusinessRules businessRules,
-        ILogger<CustomerApplicationService> logger,
-        ILogger<CustomerAggregateRoot> customerLogger)
-    {
-        _customerRepository = customerRepository ?? throw new ArgumentNullException(nameof(customerRepository));
-        _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
-        _businessRules = businessRules ?? throw new ArgumentNullException(nameof(businessRules));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _customerLogger = customerLogger ?? throw new ArgumentNullException(nameof(customerLogger));
-    }
+    private readonly ICustomerAggregateRepository _customerRepository = customerRepository ?? throw new ArgumentNullException(nameof(customerRepository));
+    private readonly IDomainEventDispatcher _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
+    private readonly CustomerBusinessRules _businessRules = businessRules ?? throw new ArgumentNullException(nameof(businessRules));
+    private readonly ILogger<CustomerApplicationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger<CustomerAggregateRoot> _customerLogger = customerLogger ?? throw new ArgumentNullException(nameof(customerLogger));
 
     public async Task<Guid> CreateCustomerAndPlaceOrderAsync(
         string customerName,
@@ -35,13 +26,13 @@ public class CustomerApplicationService
     {
         try
         {
-            var customerId = Guid.NewGuid();
-            var customer = new CustomerAggregateRoot(customerId, customerName, _businessRules, _customerLogger);
-            var order = customer.PlaceNewOrder();
+            Guid customerId = Guid.NewGuid();
+            CustomerAggregateRoot customer = new(customerId, customerName, _businessRules, _customerLogger);
+            Domain.Entities.Order order = customer.PlaceNewOrder();
 
-            foreach (var (product, quantity, price) in orderItemsData)
+            foreach ((string product, int quantity, decimal price) in orderItemsData)
             {
-                var item = new OrderItem(product, quantity, price);
+                OrderItem item = new(product, quantity, price);
                 customer.AddItemToOrder(order.Id, item);
             }
 
@@ -69,17 +60,17 @@ public class CustomerApplicationService
     {
         try
         {
-            var customer = await _customerRepository.GetByIdAsync(customerId, cancellationToken);
+            CustomerAggregateRoot? customer = await _customerRepository.GetByIdAsync(customerId, cancellationToken);
             if (customer == null)
             {
-                var exception = new InvalidOperationException($"Customer {customerId} not found");
+                InvalidOperationException exception = new($"Customer {customerId} not found");
                 _logger.LogWarning(exception, "Customer {CustomerId} not found", customerId);
                 throw exception;
             }
 
-            foreach (var (product, quantity, price) in newItemsData)
+            foreach ((string product, int quantity, decimal price) in newItemsData)
             {
-                var item = new OrderItem(product, quantity, price);
+                OrderItem item = new(product, quantity, price);
                 customer.AddItemToOrder(orderId, item);
             }
 

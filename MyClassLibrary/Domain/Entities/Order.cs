@@ -1,5 +1,4 @@
 ﻿using MyClassLibrary.Domain.ValueObjects;
-using MyClassLibrary.Domain.Events;
 
 namespace MyClassLibrary.Domain.Entities;
 
@@ -29,7 +28,7 @@ public class Order
         ArgumentNullException.ThrowIfNull(item);
 
         // Business rule: Prevent duplicate items by combining quantities
-        var existingItem = _items.FirstOrDefault(i => i.Product == item.Product && i.Price == item.Price);
+        OrderItem? existingItem = _items.FirstOrDefault(i => i.Product == item.Product && i.Price == item.Price);
         if (existingItem != null)
         {
             _items.Remove(existingItem);

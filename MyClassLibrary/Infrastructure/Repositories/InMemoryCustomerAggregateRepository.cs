@@ -4,21 +4,16 @@ using MyClassLibrary.Domain.Aggregates;
 
 namespace MyClassLibrary.Infrastructure.Repositories;
 
-public class InMemoryCustomerAggregateRepository : ICustomerAggregateRepository
+public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggregateRepository> logger) : ICustomerAggregateRepository
 {
     private static readonly Dictionary<Guid, CustomerAggregateRoot> _customers = [];
-    private readonly ILogger<InMemoryCustomerAggregateRepository> _logger;
-
-    public InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggregateRepository> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<InMemoryCustomerAggregateRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving customer aggregate with ID {CustomerId}", id);
 
-        var found = _customers.TryGetValue(id, out var customer);
+        bool found = _customers.TryGetValue(id, out CustomerAggregateRoot? customer);
 
         if (!found)
         {
@@ -36,8 +31,8 @@ public class InMemoryCustomerAggregateRepository : ICustomerAggregateRepository
     {
         ArgumentNullException.ThrowIfNull(customer);
 
-        var isUpdate = _customers.ContainsKey(customer.Id);
-        var action = isUpdate ? "Updated" : "Created";
+        bool isUpdate = _customers.ContainsKey(customer.Id);
+        string action = isUpdate ? "Updated" : "Created";
 
         _customers[customer.Id] = customer;
 

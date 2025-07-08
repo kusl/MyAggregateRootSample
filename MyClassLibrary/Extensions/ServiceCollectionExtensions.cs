@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using MyClassLibrary.Application.Interfaces;
 using MyClassLibrary.Application.Services;
 using MyClassLibrary.Domain.Configuration;
@@ -14,9 +13,9 @@ public static class ServiceCollectionExtensions
     {
         // Configure business rules
         services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
-        services.AddSingleton<CustomerBusinessRules>(provider =>
+        services.AddSingleton(provider =>
         {
-            var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<CustomerBusinessRules>>();
+            Microsoft.Extensions.Options.IOptions<CustomerBusinessRules> options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<CustomerBusinessRules>>();
             return options.Value;
         });
 

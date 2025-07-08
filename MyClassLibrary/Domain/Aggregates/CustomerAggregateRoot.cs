@@ -42,17 +42,17 @@ public class CustomerAggregateRoot
 
     public Order PlaceNewOrder()
     {
-        var outstandingOrders = _orders.Count(o => o.IsOutstanding(_businessRules.OutstandingOrderDays));
+        int outstandingOrders = _orders.Count(o => o.IsOutstanding(_businessRules.OutstandingOrderDays));
 
         if (outstandingOrders >= _businessRules.MaxOutstandingOrders)
         {
-            var exception = new InvalidOperationException(
+            InvalidOperationException exception = new(
                 $"Customer '{Name}' has reached the maximum of {_businessRules.MaxOutstandingOrders} outstanding orders.");
             _logger?.LogWarning(exception, "Order placement failed for customer {CustomerId}", Id);
             throw exception;
         }
 
-        var newOrder = new Order(Guid.NewGuid(), DateTime.UtcNow);
+        Order newOrder = new(Guid.NewGuid(), DateTime.UtcNow);
         _orders.Add(newOrder);
 
         AddDomainEvent(new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, Id, newOrder.Id, newOrder.OrderDate));
@@ -68,10 +68,10 @@ public class CustomerAggregateRoot
 
     public void AddItemToOrder(Guid orderId, OrderItem item)
     {
-        var order = GetOrder(orderId);
+        Order? order = GetOrder(orderId);
         if (order == null)
         {
-            var exception = new InvalidOperationException($"Order {orderId} not found for customer {Id}");
+            InvalidOperationException exception = new($"Order {orderId} not found for customer {Id}");
             _logger?.LogWarning(exception, "Failed to add item to order {OrderId} for customer {CustomerId}", orderId, Id);
             throw exception;
         }
