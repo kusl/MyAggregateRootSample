@@ -27,11 +27,11 @@ public class CustomerAggregateRootTests
     public void Constructor_ValidParameters_CreatesCustomer()
     {
         // Arrange
-        var customerId = Guid.NewGuid();
+        Guid customerId = Guid.NewGuid();
         const string customerName = "John Doe";
 
         // Act
-        var customer = new CustomerAggregateRoot(customerId, customerName, _businessRules, _mockLogger);
+        CustomerAggregateRoot customer = new(customerId, customerName, _businessRules, _mockLogger);
 
         // Assert
         Assert.Equal(customerId, customer.Id);
@@ -39,7 +39,7 @@ public class CustomerAggregateRootTests
         Assert.Empty(customer.Orders);
         Assert.Single(customer.DomainEvents);
 
-        var createdEvent = Assert.IsType<CustomerCreatedEvent>(customer.DomainEvents[0]);
+        CustomerCreatedEvent createdEvent = Assert.IsType<CustomerCreatedEvent>(customer.DomainEvents[0]);
         Assert.Equal(customerId, createdEvent.CustomerId);
         Assert.Equal(customerName, createdEvent.CustomerName);
     }
@@ -48,7 +48,7 @@ public class CustomerAggregateRootTests
     public void Constructor_EmptyId_ThrowsArgumentException()
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new CustomerAggregateRoot(Guid.Empty, "Name", _businessRules, _mockLogger));
         Assert.Contains("Customer ID cannot be empty", exception.Message);
     }
@@ -60,7 +60,7 @@ public class CustomerAggregateRootTests
     public void Constructor_InvalidName_ThrowsArgumentException(string? name)
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new CustomerAggregateRoot(Guid.NewGuid(), name!, _businessRules, _mockLogger));
         Assert.Contains("Customer name cannot be null or empty", exception.Message);
     }
@@ -80,7 +80,7 @@ public class CustomerAggregateRootTests
         const string nameWithSpaces = "  John Doe  ";
 
         // Act
-        var customer = new CustomerAggregateRoot(Guid.NewGuid(), nameWithSpaces, _businessRules, _mockLogger);
+        CustomerAggregateRoot customer = new(Guid.NewGuid(), nameWithSpaces, _businessRules, _mockLogger);
 
         // Assert
         Assert.Equal("John Doe", customer.Name);
@@ -90,10 +90,10 @@ public class CustomerAggregateRootTests
     public void PlaceNewOrder_UnderLimit_CreatesOrder()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
 
         // Act
-        var order = customer.PlaceNewOrder();
+        MyClassLibrary.Domain.Entities.Order order = customer.PlaceNewOrder();
 
         // Assert
         Assert.NotEqual(Guid.Empty, order.Id);
@@ -101,7 +101,7 @@ public class CustomerAggregateRootTests
         Assert.Equal(order.Id, customer.Orders[0].Id);
         Assert.Equal(2, customer.DomainEvents.Count); // CustomerCreated + OrderPlaced
 
-        var orderPlacedEvent = customer.DomainEvents.OfType<OrderPlacedEvent>().FirstOrDefault();
+        OrderPlacedEvent? orderPlacedEvent = customer.DomainEvents.OfType<OrderPlacedEvent>().FirstOrDefault();
         Assert.NotNull(orderPlacedEvent);
         Assert.Equal(customer.Id, orderPlacedEvent.CustomerId);
         Assert.Equal(order.Id, orderPlacedEvent.OrderId);
@@ -113,7 +113,7 @@ public class CustomerAggregateRootTests
     public void PlaceNewOrder_ReachesMaxOutstandingOrders_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
 
         // Place maximum allowed orders
         for (int i = 0; i < _businessRules.MaxOutstandingOrders; i++)
@@ -122,7 +122,7 @@ public class CustomerAggregateRootTests
         }
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains($"has reached the maximum of {_businessRules.MaxOutstandingOrders} outstanding orders", exception.Message);
         Assert.True(_mockLogger.ContainsMessage("Order placement failed", Microsoft.Extensions.Logging.LogLevel.Warning));
     }
@@ -131,11 +131,11 @@ public class CustomerAggregateRootTests
     public void GetOrder_ExistingOrder_ReturnsOrder()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var order = customer.PlaceNewOrder();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        MyClassLibrary.Domain.Entities.Order order = customer.PlaceNewOrder();
 
         // Act
-        var retrievedOrder = customer.GetOrder(order.Id);
+        MyClassLibrary.Domain.Entities.Order? retrievedOrder = customer.GetOrder(order.Id);
 
         // Assert
         Assert.NotNull(retrievedOrder);
@@ -146,10 +146,10 @@ public class CustomerAggregateRootTests
     public void GetOrder_NonExistentOrder_ReturnsNull()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
 
         // Act
-        var retrievedOrder = customer.GetOrder(Guid.NewGuid());
+        MyClassLibrary.Domain.Entities.Order? retrievedOrder = customer.GetOrder(Guid.NewGuid());
 
         // Assert
         Assert.Null(retrievedOrder);
@@ -159,9 +159,9 @@ public class CustomerAggregateRootTests
     public void AddItemToOrder_ValidOrder_AddsItem()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var order = customer.PlaceNewOrder();
-        var item = TestDataBuilder.CreateOrderItem("Product 1", 2, 25.00m);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        MyClassLibrary.Domain.Entities.Order order = customer.PlaceNewOrder();
+        OrderItem item = TestDataBuilder.CreateOrderItem("Product 1", 2, 25.00m);
 
         // Act
         customer.AddItemToOrder(order.Id, item);
@@ -171,7 +171,7 @@ public class CustomerAggregateRootTests
         Assert.Equal(item, order.Items[0]);
         Assert.Equal(3, customer.DomainEvents.Count); // CustomerCreated + OrderPlaced + OrderItemAdded
 
-        var itemAddedEvent = customer.DomainEvents.OfType<OrderItemAddedEvent>().FirstOrDefault();
+        OrderItemAddedEvent? itemAddedEvent = customer.DomainEvents.OfType<OrderItemAddedEvent>().FirstOrDefault();
         Assert.NotNull(itemAddedEvent);
         Assert.Equal(customer.Id, itemAddedEvent.CustomerId);
         Assert.Equal(order.Id, itemAddedEvent.OrderId);
@@ -184,12 +184,12 @@ public class CustomerAggregateRootTests
     public void AddItemToOrder_NonExistentOrder_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var item = TestDataBuilder.CreateOrderItem();
-        var nonExistentOrderId = Guid.NewGuid();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        OrderItem item = TestDataBuilder.CreateOrderItem();
+        Guid nonExistentOrderId = Guid.NewGuid();
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
             customer.AddItemToOrder(nonExistentOrderId, item));
         Assert.Contains($"Order {nonExistentOrderId} not found", exception.Message);
         Assert.True(_mockLogger.ContainsMessage("Failed to add item to order", Microsoft.Extensions.Logging.LogLevel.Warning));
@@ -199,7 +199,7 @@ public class CustomerAggregateRootTests
     public void ClearDomainEvents_RemovesAllEvents()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
         customer.PlaceNewOrder();
         Assert.Equal(2, customer.DomainEvents.Count);
 
@@ -214,12 +214,12 @@ public class CustomerAggregateRootTests
     public void PlaceNewOrder_AllOrdersCountAsOutstanding_EnforcesLimit()
     {
         // Arrange
-        var businessRules = new CustomerBusinessRules
+        CustomerBusinessRules businessRules = new()
         {
             MaxOutstandingOrders = 2,
             OutstandingOrderDays = 1 // Very short outstanding period
         };
-        var customer = TestDataBuilder.CreateCustomer(businessRules: businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: businessRules, logger: _mockLogger);
 
         // Place maximum allowed orders
         customer.PlaceNewOrder();
@@ -227,7 +227,7 @@ public class CustomerAggregateRootTests
 
         // Act & Assert - Third order should fail because all orders are considered outstanding
         // (The current implementation creates all orders with DateTime.UtcNow, so they're all outstanding)
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains("has reached the maximum of 2 outstanding orders", exception.Message);
     }
 }
