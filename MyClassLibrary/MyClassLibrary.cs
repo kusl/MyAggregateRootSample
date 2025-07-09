@@ -97,8 +97,8 @@ public class Order
     public IReadOnlyList<OrderItem> Items => _items.AsReadOnly();
 
     // For ORM reconstruction
-    private Order() 
-    { 
+    private Order()
+    {
         ShippingAddress = null!;
         BillingAddress = null!;
     }
@@ -109,7 +109,7 @@ public class Order
             throw new ArgumentException("Order ID cannot be empty.", nameof(id));
         if (orderDate > DateTime.UtcNow)
             throw new ArgumentException("Order date cannot be in the future.", nameof(orderDate));
-        
+
         Id = id;
         OrderDate = orderDate;
         ShippingAddress = shippingAddress ?? throw new ArgumentNullException(nameof(shippingAddress));
@@ -235,10 +235,10 @@ public class CustomerAggregateRoot
         _orders.Add(newOrder);
 
         AddDomainEvent(new OrderPlacedEvent(
-            Guid.NewGuid(), 
-            DateTime.UtcNow, 
-            Id, 
-            newOrder.Id, 
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            Id,
+            newOrder.Id,
             newOrder.OrderDate,
             orderShippingAddress,
             orderBillingAddress));
@@ -318,10 +318,10 @@ public class CustomerApplicationService(
         {
             Guid customerId = Guid.NewGuid();
             CustomerAggregateRoot customer = new(customerId, customerName, _businessRules, _customerLogger);
-            
+
             // Set default addresses
             customer.UpdateDefaultAddresses(shippingAddress, billingAddress);
-            
+
             // Place order with the same addresses
             Order order = customer.PlaceNewOrder(shippingAddress, billingAddress);
 

@@ -1,8 +1,8 @@
 // MyClassLibrary.Tests.cs - All test code in one file
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using Xunit;
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 namespace MyClassLibrary.Tests;
@@ -1452,8 +1452,8 @@ public class CustomerApplicationServiceTests : IDisposable
         }
     }
 
-        // Additional test for Order edge cases
-        public class OrderAdditionalTests : IDisposable
+    // Additional test for Order edge cases
+    public class OrderAdditionalTests : IDisposable
     {
         public OrderAdditionalTests()
         {
