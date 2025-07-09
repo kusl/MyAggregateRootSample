@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using Xunit;
-
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 namespace MyClassLibrary.Tests;
 
 // ========== TEST HELPERS ==========
@@ -1082,8 +1082,8 @@ public class CustomerApplicationServiceTests : IDisposable
         Assert.True(_mockServiceLogger.ContainsMessage($"Customer {nonExistentCustomerId} not found", LogLevel.Warning));
     }
 
-    // 1. Fix the PlaceOrderForExistingCustomerAsync_Success_PlacesOrder test:
-    // Replace this test method with:
+    // Fix the PlaceOrderForExistingCustomerAsync_Success_PlacesOrder test to handle the fact
+    // that the mock repository might have residual state:
 
     [Fact]
     public async Task PlaceOrderForExistingCustomerAsync_Success_PlacesOrder()
@@ -1105,7 +1105,12 @@ public class CustomerApplicationServiceTests : IDisposable
 
         // Assert
         Assert.NotEqual(Guid.Empty, orderId);
-        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+
+        // Get the last saved state of this specific customer
+        var updatedCustomer = _mockRepository.SavedCustomers
+            .Where(c => c.Id == customer.Id)
+            .Last();
+
         Assert.Equal(2, updatedCustomer.Orders.Count); // One from setup, one new
 
         var newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
@@ -1796,13 +1801,17 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
         Assert.Equal(customer.Id, result2.Id);
     }
 
-    // 2. Fix the SaveAsync_MultipleCustomers_SavesAll test:
-    // Replace this test method with:
+    // Also, update the SaveAsync_MultipleCustomers_SavesAll test to ensure complete isolation:
 
     [Fact]
     public async Task SaveAsync_MultipleCustomers_SavesAll()
     {
         // Arrange
+        // Create a new repository instance for this test
+        InMemoryCustomerAggregateRepository.ClearRepository(); // Clear before starting
+        var testLogger = new MockLogger<InMemoryCustomerAggregateRepository>();
+        var testRepository = new InMemoryCustomerAggregateRepository(testLogger);
+
         var customers = new[]
         {
         TestDataBuilder.CreateCustomer("Customer 1"),
@@ -1813,16 +1822,13 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
         // Act
         foreach (var customer in customers)
         {
-            await _repository.SaveAsync(customer);
+            await testRepository.SaveAsync(customer);
         }
-
-        // Clear the logger to avoid confusion
-        _mockLogger.Clear();
 
         // Assert - All customers should be retrievable
         foreach (var customer in customers)
         {
-            var retrieved = await _repository.GetByIdAsync(customer.Id);
+            var retrieved = await testRepository.GetByIdAsync(customer.Id);
             Assert.NotNull(retrieved);
             Assert.Equal(customer.Name, retrieved.Name);
         }

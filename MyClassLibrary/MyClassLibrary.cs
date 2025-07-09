@@ -476,24 +476,31 @@ public class LoggingDomainEventDispatcher(ILogger<LoggingDomainEventDispatcher> 
     }
 }
 
+// Replace the InMemoryCustomerAggregateRepository class in MyClassLibrary.cs with this thread-safe version:
+
 public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggregateRepository> logger) : ICustomerAggregateRepository
 {
     private static readonly Dictionary<Guid, CustomerAggregateRoot> _customers = [];
+    private static readonly object _lock = new object(); // Add lock for thread safety
     private readonly ILogger<InMemoryCustomerAggregateRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Retrieving customer aggregate with ID {CustomerId}", id);
 
-        bool found = _customers.TryGetValue(id, out CustomerAggregateRoot? customer);
+        CustomerAggregateRoot? customer;
+        lock (_lock)
+        {
+            _customers.TryGetValue(id, out customer);
+        }
 
-        if (!found)
+        if (customer == null)
         {
             _logger.LogWarning("Customer aggregate with ID {CustomerId} not found", id);
         }
         else
         {
-            _logger.LogDebug("Found customer aggregate {CustomerName} with ID {CustomerId}", customer!.Name, id);
+            _logger.LogDebug("Found customer aggregate {CustomerName} with ID {CustomerId}", customer.Name, id);
         }
 
         return Task.FromResult(customer);
@@ -503,11 +510,14 @@ public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggrega
     {
         ArgumentNullException.ThrowIfNull(customer);
 
-        bool isUpdate = _customers.ContainsKey(customer.Id);
+        bool isUpdate;
+        lock (_lock)
+        {
+            isUpdate = _customers.ContainsKey(customer.Id);
+            _customers[customer.Id] = customer;
+        }
+
         string action = isUpdate ? "Updated" : "Created";
-
-        _customers[customer.Id] = customer;
-
         _logger.LogInformation("{Action} customer aggregate {CustomerName} with ID {CustomerId}",
             action, customer.Name, customer.Id);
 
@@ -516,7 +526,10 @@ public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggrega
 
     public static void ClearRepository()
     {
-        _customers.Clear();
+        lock (_lock)
+        {
+            _customers.Clear();
+        }
     }
 }
 
