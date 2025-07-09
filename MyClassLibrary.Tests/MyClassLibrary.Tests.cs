@@ -101,7 +101,7 @@ public class AddressTests
     public void Constructor_ValidParameters_CreatesAddress()
     {
         // Arrange & Act
-        var address = new Address("123 Main St", "Anytown", "CA", "12345", "USA");
+        Address address = new("123 Main St", "Anytown", "CA", "12345", "USA");
 
         // Assert
         Assert.Equal("123 Main St", address.Street);
@@ -123,7 +123,7 @@ public class AddressTests
         string? street, string? city, string? state, string? postalCode, string? country, string paramName)
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new Address(street!, city!, state!, postalCode!, country!));
         Assert.Contains($"{paramName} cannot be null or empty", exception.Message);
     }
@@ -132,7 +132,7 @@ public class AddressTests
     public void Constructor_TrimsWhitespace()
     {
         // Arrange & Act
-        var address = new Address("  123 Main St  ", "  Anytown  ", "  CA  ", "  12345  ", "  USA  ");
+        Address address = new("  123 Main St  ", "  Anytown  ", "  CA  ", "  12345  ", "  USA  ");
 
         // Assert
         Assert.Equal("123 Main St", address.Street);
@@ -146,10 +146,10 @@ public class AddressTests
     public void ToString_ReturnsFormattedAddress()
     {
         // Arrange
-        var address = new Address("123 Main St", "Anytown", "CA", "12345", "USA");
+        Address address = new("123 Main St", "Anytown", "CA", "12345", "USA");
 
         // Act
-        var result = address.ToString();
+        string result = address.ToString();
 
         // Assert
         Assert.Equal("123 Main St, Anytown, CA 12345, USA", result);
@@ -159,9 +159,9 @@ public class AddressTests
     public void Address_RecordEquality_WorksCorrectly()
     {
         // Arrange
-        var address1 = new Address("123 Main St", "Anytown", "CA", "12345", "USA");
-        var address2 = new Address("123 Main St", "Anytown", "CA", "12345", "USA");
-        var address3 = new Address("456 Elm St", "Anytown", "CA", "12345", "USA");
+        Address address1 = new("123 Main St", "Anytown", "CA", "12345", "USA");
+        Address address2 = new("123 Main St", "Anytown", "CA", "12345", "USA");
+        Address address3 = new("456 Elm St", "Anytown", "CA", "12345", "USA");
 
         // Act & Assert
         Assert.Equal(address1, address2);
@@ -294,13 +294,13 @@ public class OrderTests : IDisposable
     public void Constructor_ValidParameters_CreatesOrder()
     {
         // Arrange
-        var orderId = Guid.NewGuid();
-        var orderDate = DateTime.UtcNow.AddDays(-1);
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+        Guid orderId = Guid.NewGuid();
+        DateTime orderDate = DateTime.UtcNow.AddDays(-1);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
 
         // Act
-        var order = new Order(orderId, orderDate, shippingAddress, billingAddress);
+        Order order = new(orderId, orderDate, shippingAddress, billingAddress);
 
         // Assert
         Assert.Equal(orderId, order.Id);
@@ -315,11 +315,11 @@ public class OrderTests : IDisposable
     public void Constructor_EmptyId_ThrowsArgumentException()
     {
         // Arrange
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress();
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress();
 
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new Order(Guid.Empty, DateTime.UtcNow, shippingAddress, billingAddress));
         Assert.Contains("Order ID cannot be empty", exception.Message);
     }
@@ -328,11 +328,11 @@ public class OrderTests : IDisposable
     public void Constructor_FutureDate_ThrowsArgumentException()
     {
         // Arrange
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress();
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress();
 
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new Order(Guid.NewGuid(), DateTime.UtcNow.AddDays(1), shippingAddress, billingAddress));
         Assert.Contains("Order date cannot be in the future", exception.Message);
     }
@@ -341,7 +341,7 @@ public class OrderTests : IDisposable
     public void Constructor_NullShippingAddress_ThrowsArgumentNullException()
     {
         // Arrange
-        var billingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress();
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
@@ -352,7 +352,7 @@ public class OrderTests : IDisposable
     public void Constructor_NullBillingAddress_ThrowsArgumentNullException()
     {
         // Arrange
-        var shippingAddress = TestDataBuilder.CreateAddress();
+        Address shippingAddress = TestDataBuilder.CreateAddress();
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
@@ -363,8 +363,8 @@ public class OrderTests : IDisposable
     public void AddItem_ValidItem_AddsToOrder()
     {
         // Arrange
-        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
-        var item = TestDataBuilder.CreateOrderItem("Product 1", 2, 15.00m);
+        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+        OrderItem item = TestDataBuilder.CreateOrderItem("Product 1", 2, 15.00m);
 
         // Act
         order.AddItem(item);
@@ -379,7 +379,7 @@ public class OrderTests : IDisposable
     public void AddItem_NullItem_ThrowsArgumentNullException()
     {
         // Arrange
-        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => order.AddItem(null!));
@@ -389,9 +389,9 @@ public class OrderTests : IDisposable
     public void AddItem_DuplicateItem_CombinesQuantities()
     {
         // Arrange
-        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
-        var item1 = new OrderItem("Product A", 2, 10.00m);
-        var item2 = new OrderItem("Product A", 3, 10.00m);
+        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+        OrderItem item1 = new("Product A", 2, 10.00m);
+        OrderItem item2 = new("Product A", 3, 10.00m);
 
         // Act
         order.AddItem(item1);
@@ -409,9 +409,9 @@ public class OrderTests : IDisposable
     public void AddItem_SameProductDifferentPrice_DoesNotCombine()
     {
         // Arrange
-        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
-        var item1 = new OrderItem("Product A", 2, 10.00m);
-        var item2 = new OrderItem("Product A", 3, 15.00m);
+        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+        OrderItem item1 = new("Product A", 2, 10.00m);
+        OrderItem item2 = new("Product A", 3, 15.00m);
 
         // Act
         order.AddItem(item1);
@@ -426,16 +426,16 @@ public class OrderTests : IDisposable
     public void TotalAmount_MultipleItems_CalculatesCorrectly()
     {
         // Arrange
-        var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
-        var items = new[]
-        {
+        Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1), TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+        OrderItem[] items =
+        [
             new OrderItem("Product 1", 2, 10.00m),
             new OrderItem("Product 2", 1, 15.50m),
             new OrderItem("Product 3", 3, 7.25m)
-        };
+        ];
 
         // Act
-        foreach (var item in items)
+        foreach (OrderItem? item in items)
         {
             order.AddItem(item);
         }
@@ -454,12 +454,12 @@ public class OrderTests : IDisposable
     public void IsOutstanding_VariousDays_ReturnsCorrectResult(int daysAgo, bool expectedOutstanding)
     {
         // Arrange
-        var orderDate = DateTime.UtcNow.AddDays(-daysAgo);
-        var order = new Order(Guid.NewGuid(), orderDate, TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+        DateTime orderDate = DateTime.UtcNow.AddDays(-daysAgo);
+        Order order = new(Guid.NewGuid(), orderDate, TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
         const int outstandingDays = 30;
 
         // Act
-        var isOutstanding = order.IsOutstanding(outstandingDays);
+        bool isOutstanding = order.IsOutstanding(outstandingDays);
 
         // Assert
         Assert.Equal(expectedOutstanding, isOutstanding);
@@ -493,11 +493,11 @@ public class CustomerAggregateRootTests : IDisposable
     public void Constructor_ValidParameters_CreatesCustomer()
     {
         // Arrange
-        var customerId = Guid.NewGuid();
+        Guid customerId = Guid.NewGuid();
         const string customerName = "John Doe";
 
         // Act
-        var customer = new CustomerAggregateRoot(customerId, customerName, _businessRules, _mockLogger);
+        CustomerAggregateRoot customer = new(customerId, customerName, _businessRules, _mockLogger);
 
         // Assert
         Assert.Equal(customerId, customer.Id);
@@ -507,7 +507,7 @@ public class CustomerAggregateRootTests : IDisposable
         Assert.Empty(customer.Orders);
         Assert.Single(customer.DomainEvents);
 
-        var createdEvent = Assert.IsType<CustomerCreatedEvent>(customer.DomainEvents[0]);
+        CustomerCreatedEvent createdEvent = Assert.IsType<CustomerCreatedEvent>(customer.DomainEvents[0]);
         Assert.Equal(customerId, createdEvent.CustomerId);
         Assert.Equal(customerName, createdEvent.CustomerName);
     }
@@ -516,7 +516,7 @@ public class CustomerAggregateRootTests : IDisposable
     public void Constructor_EmptyId_ThrowsArgumentException()
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new CustomerAggregateRoot(Guid.Empty, "Name", _businessRules, _mockLogger));
         Assert.Contains("Customer ID cannot be empty", exception.Message);
     }
@@ -528,7 +528,7 @@ public class CustomerAggregateRootTests : IDisposable
     public void Constructor_InvalidName_ThrowsArgumentException(string? name)
     {
         // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() =>
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
             new CustomerAggregateRoot(Guid.NewGuid(), name!, _businessRules, _mockLogger));
         Assert.Contains("Customer name cannot be null or empty", exception.Message);
     }
@@ -548,7 +548,7 @@ public class CustomerAggregateRootTests : IDisposable
         const string nameWithSpaces = "  John Doe  ";
 
         // Act
-        var customer = new CustomerAggregateRoot(Guid.NewGuid(), nameWithSpaces, _businessRules, _mockLogger);
+        CustomerAggregateRoot customer = new(Guid.NewGuid(), nameWithSpaces, _businessRules, _mockLogger);
 
         // Assert
         Assert.Equal("John Doe", customer.Name);
@@ -558,9 +558,9 @@ public class CustomerAggregateRootTests : IDisposable
     public void UpdateDefaultAddresses_SetsAddresses_CreatesEvents()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
 
         // Act
         customer.UpdateDefaultAddresses(shippingAddress, billingAddress);
@@ -577,8 +577,8 @@ public class CustomerAggregateRootTests : IDisposable
     public void UpdateDefaultAddresses_NullAddresses_SetsToNull()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var initialAddress = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address initialAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(initialAddress, initialAddress);
         customer.ClearDomainEvents();
 
@@ -595,12 +595,12 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_WithAddresses_CreatesOrder()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
 
         // Act
-        var order = customer.PlaceNewOrder(shippingAddress, billingAddress);
+        Order order = customer.PlaceNewOrder(shippingAddress, billingAddress);
 
         // Assert
         Assert.NotEqual(Guid.Empty, order.Id);
@@ -610,7 +610,7 @@ public class CustomerAggregateRootTests : IDisposable
         Assert.Equal(order.Id, customer.Orders[0].Id);
         Assert.Equal(2, customer.DomainEvents.Count); // CustomerCreated + OrderPlaced
 
-        var orderPlacedEvent = customer.DomainEvents.OfType<OrderPlacedEvent>().FirstOrDefault();
+        OrderPlacedEvent? orderPlacedEvent = customer.DomainEvents.OfType<OrderPlacedEvent>().FirstOrDefault();
         Assert.NotNull(orderPlacedEvent);
         Assert.Equal(customer.Id, orderPlacedEvent.CustomerId);
         Assert.Equal(order.Id, orderPlacedEvent.OrderId);
@@ -624,13 +624,13 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_WithDefaultAddresses_UsesDefaults()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
         customer.UpdateDefaultAddresses(shippingAddress, billingAddress);
 
         // Act
-        var order = customer.PlaceNewOrder();
+        Order order = customer.PlaceNewOrder();
 
         // Assert
         Assert.Equal(shippingAddress, order.ShippingAddress);
@@ -641,10 +641,10 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_NoAddressesProvided_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains("Shipping address is required", exception.Message);
     }
 
@@ -652,12 +652,12 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_NoShippingAddress_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var billingAddress = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address billingAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(null, billingAddress);
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains("Shipping address is required", exception.Message);
     }
 
@@ -665,12 +665,12 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_NoBillingAddress_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var shippingAddress = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(shippingAddress, null);
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains("Billing address is required", exception.Message);
     }
 
@@ -678,8 +678,8 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_ReachesMaxOutstandingOrders_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var address = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address address = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(address, address);
 
         // Place maximum allowed orders
@@ -689,7 +689,7 @@ public class CustomerAggregateRootTests : IDisposable
         }
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains($"has reached the maximum of {_businessRules.MaxOutstandingOrders} outstanding orders", exception.Message);
         Assert.True(_mockLogger.ContainsMessage("Order placement failed", LogLevel.Warning));
     }
@@ -698,12 +698,12 @@ public class CustomerAggregateRootTests : IDisposable
     public void GetOrder_ExistingOrder_ReturnsOrder()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var address = TestDataBuilder.CreateAddress();
-        var order = customer.PlaceNewOrder(address, address);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address address = TestDataBuilder.CreateAddress();
+        Order order = customer.PlaceNewOrder(address, address);
 
         // Act
-        var retrievedOrder = customer.GetOrder(order.Id);
+        Order? retrievedOrder = customer.GetOrder(order.Id);
 
         // Assert
         Assert.NotNull(retrievedOrder);
@@ -714,10 +714,10 @@ public class CustomerAggregateRootTests : IDisposable
     public void GetOrder_NonExistentOrder_ReturnsNull()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
 
         // Act
-        var retrievedOrder = customer.GetOrder(Guid.NewGuid());
+        Order? retrievedOrder = customer.GetOrder(Guid.NewGuid());
 
         // Assert
         Assert.Null(retrievedOrder);
@@ -727,10 +727,10 @@ public class CustomerAggregateRootTests : IDisposable
     public void AddItemToOrder_ValidOrder_AddsItem()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var address = TestDataBuilder.CreateAddress();
-        var order = customer.PlaceNewOrder(address, address);
-        var item = TestDataBuilder.CreateOrderItem("Product 1", 2, 25.00m);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address address = TestDataBuilder.CreateAddress();
+        Order order = customer.PlaceNewOrder(address, address);
+        OrderItem item = TestDataBuilder.CreateOrderItem("Product 1", 2, 25.00m);
 
         // Act
         customer.AddItemToOrder(order.Id, item);
@@ -740,7 +740,7 @@ public class CustomerAggregateRootTests : IDisposable
         Assert.Equal(item, order.Items[0]);
         Assert.Equal(3, customer.DomainEvents.Count); // CustomerCreated + OrderPlaced + OrderItemAdded
 
-        var itemAddedEvent = customer.DomainEvents.OfType<OrderItemAddedEvent>().FirstOrDefault();
+        OrderItemAddedEvent? itemAddedEvent = customer.DomainEvents.OfType<OrderItemAddedEvent>().FirstOrDefault();
         Assert.NotNull(itemAddedEvent);
         Assert.Equal(customer.Id, itemAddedEvent.CustomerId);
         Assert.Equal(order.Id, itemAddedEvent.OrderId);
@@ -753,12 +753,12 @@ public class CustomerAggregateRootTests : IDisposable
     public void AddItemToOrder_NonExistentOrder_ThrowsException()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var item = TestDataBuilder.CreateOrderItem();
-        var nonExistentOrderId = Guid.NewGuid();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        OrderItem item = TestDataBuilder.CreateOrderItem();
+        Guid nonExistentOrderId = Guid.NewGuid();
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
             customer.AddItemToOrder(nonExistentOrderId, item));
         Assert.Contains($"Order {nonExistentOrderId} not found", exception.Message);
         Assert.True(_mockLogger.ContainsMessage("Failed to add item to order", LogLevel.Warning));
@@ -768,8 +768,8 @@ public class CustomerAggregateRootTests : IDisposable
     public void ClearDomainEvents_RemovesAllEvents()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
-        var address = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockLogger);
+        Address address = TestDataBuilder.CreateAddress();
         customer.PlaceNewOrder(address, address);
         Assert.Equal(2, customer.DomainEvents.Count);
 
@@ -784,13 +784,13 @@ public class CustomerAggregateRootTests : IDisposable
     public void PlaceNewOrder_AllOrdersCountAsOutstanding_EnforcesLimit()
     {
         // Arrange
-        var businessRules = new CustomerBusinessRules
+        CustomerBusinessRules businessRules = new()
         {
             MaxOutstandingOrders = 2,
             OutstandingOrderDays = 1 // Very short outstanding period
         };
-        var customer = TestDataBuilder.CreateCustomer(businessRules: businessRules, logger: _mockLogger);
-        var address = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: businessRules, logger: _mockLogger);
+        Address address = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(address, address);
 
         // Place maximum allowed orders
@@ -799,7 +799,7 @@ public class CustomerAggregateRootTests : IDisposable
 
         // Act & Assert - Third order should fail because all orders are considered outstanding
         // (The current implementation creates all orders with DateTime.UtcNow, so they're all outstanding)
-        var exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => customer.PlaceNewOrder());
         Assert.Contains("has reached the maximum of 2 outstanding orders", exception.Message);
     }
 }
@@ -812,13 +812,13 @@ public class DomainEventTests
     public void CustomerCreatedEvent_PropertiesSetCorrectly()
     {
         // Arrange
-        var eventId = Guid.NewGuid();
-        var occurredOn = DateTime.UtcNow;
-        var customerId = Guid.NewGuid();
+        Guid eventId = Guid.NewGuid();
+        DateTime occurredOn = DateTime.UtcNow;
+        Guid customerId = Guid.NewGuid();
         const string customerName = "Test Customer";
 
         // Act
-        var @event = new CustomerCreatedEvent(eventId, occurredOn, customerId, customerName);
+        CustomerCreatedEvent @event = new(eventId, occurredOn, customerId, customerName);
 
         // Assert
         Assert.Equal(eventId, @event.Id);
@@ -831,14 +831,14 @@ public class DomainEventTests
     public void CustomerAddressUpdatedEvent_PropertiesSetCorrectly()
     {
         // Arrange
-        var eventId = Guid.NewGuid();
-        var occurredOn = DateTime.UtcNow;
-        var customerId = Guid.NewGuid();
-        var oldAddress = TestDataBuilder.CreateAddress("123 Old St", "Old City", "OL", "11111", "Old Country");
-        var newAddress = TestDataBuilder.CreateAddress("456 New Ave", "New City", "NW", "22222", "New Country");
+        Guid eventId = Guid.NewGuid();
+        DateTime occurredOn = DateTime.UtcNow;
+        Guid customerId = Guid.NewGuid();
+        Address oldAddress = TestDataBuilder.CreateAddress("123 Old St", "Old City", "OL", "11111", "Old Country");
+        Address newAddress = TestDataBuilder.CreateAddress("456 New Ave", "New City", "NW", "22222", "New Country");
 
         // Act
-        var @event = new CustomerAddressUpdatedEvent(eventId, occurredOn, customerId, oldAddress, newAddress);
+        CustomerAddressUpdatedEvent @event = new(eventId, occurredOn, customerId, oldAddress, newAddress);
 
         // Assert
         Assert.Equal(eventId, @event.Id);
@@ -852,16 +852,16 @@ public class DomainEventTests
     public void OrderPlacedEvent_PropertiesSetCorrectly()
     {
         // Arrange
-        var eventId = Guid.NewGuid();
-        var occurredOn = DateTime.UtcNow;
-        var customerId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        var orderDate = DateTime.UtcNow.AddHours(-1);
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+        Guid eventId = Guid.NewGuid();
+        DateTime occurredOn = DateTime.UtcNow;
+        Guid customerId = Guid.NewGuid();
+        Guid orderId = Guid.NewGuid();
+        DateTime orderDate = DateTime.UtcNow.AddHours(-1);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
 
         // Act
-        var @event = new OrderPlacedEvent(eventId, occurredOn, customerId, orderId, orderDate, shippingAddress, billingAddress);
+        OrderPlacedEvent @event = new(eventId, occurredOn, customerId, orderId, orderDate, shippingAddress, billingAddress);
 
         // Assert
         Assert.Equal(eventId, @event.Id);
@@ -877,14 +877,14 @@ public class DomainEventTests
     public void OrderItemAddedEvent_PropertiesSetCorrectly()
     {
         // Arrange
-        var eventId = Guid.NewGuid();
-        var occurredOn = DateTime.UtcNow;
-        var customerId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        var item = new OrderItem("Product", 5, 10.00m);
+        Guid eventId = Guid.NewGuid();
+        DateTime occurredOn = DateTime.UtcNow;
+        Guid customerId = Guid.NewGuid();
+        Guid orderId = Guid.NewGuid();
+        OrderItem item = new("Product", 5, 10.00m);
 
         // Act
-        var @event = new OrderItemAddedEvent(eventId, occurredOn, customerId, orderId, item);
+        OrderItemAddedEvent @event = new(eventId, occurredOn, customerId, orderId, item);
 
         // Assert
         Assert.Equal(eventId, @event.Id);
@@ -898,14 +898,14 @@ public class DomainEventTests
     public void DomainEvents_RecordEquality_WorksCorrectly()
     {
         // Arrange
-        var eventId = Guid.NewGuid();
-        var occurredOn = DateTime.UtcNow;
-        var customerId = Guid.NewGuid();
+        Guid eventId = Guid.NewGuid();
+        DateTime occurredOn = DateTime.UtcNow;
+        Guid customerId = Guid.NewGuid();
         const string customerName = "Test";
 
-        var event1 = new CustomerCreatedEvent(eventId, occurredOn, customerId, customerName);
-        var event2 = new CustomerCreatedEvent(eventId, occurredOn, customerId, customerName);
-        var event3 = new CustomerCreatedEvent(Guid.NewGuid(), occurredOn, customerId, customerName);
+        CustomerCreatedEvent event1 = new(eventId, occurredOn, customerId, customerName);
+        CustomerCreatedEvent event2 = new(eventId, occurredOn, customerId, customerName);
+        CustomerCreatedEvent event3 = new(Guid.NewGuid(), occurredOn, customerId, customerName);
 
         // Act & Assert
         Assert.Equal(event1, event2);
@@ -1016,16 +1016,16 @@ public class CustomerApplicationServiceTests : IDisposable
     {
         // Arrange
         const string customerName = "John Doe";
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
-        var orderItems = TestDataBuilder.CreateOrderItems(3);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems(3);
 
         // Act
-        var customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, shippingAddress, billingAddress, emptyOrderItems);
+        Guid customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, shippingAddress, billingAddress, emptyOrderItems);
 
         // Assert
         Assert.NotEqual(Guid.Empty, customerId);
-        var savedCustomer = _mockRepository.SavedCustomers.First();
+        CustomerAggregateRoot savedCustomer = _mockRepository.SavedCustomers.First();
         Assert.Single(savedCustomer.Orders);
         Assert.Empty(savedCustomer.Orders[0].Items);
     }
@@ -1035,9 +1035,9 @@ public class CustomerApplicationServiceTests : IDisposable
     {
         // Arrange
         const string customerName = "Error Customer";
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress();
-        var orderItems = TestDataBuilder.CreateOrderItems();
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress();
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems();
         _mockRepository.ThrowOnSave = true;
 
         // Act & Assert
@@ -1051,17 +1051,17 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task UpdateCustomerAddressesAsync_Success_UpdatesAddresses()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
         _mockRepository.AddCustomer(customer);
 
-        var newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
-        var newBillingAddress = TestDataBuilder.CreateAddress("321 Bill St", "Bill City", "BC", "88888", "Bill Country");
+        Address newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
+        Address newBillingAddress = TestDataBuilder.CreateAddress("321 Bill St", "Bill City", "BC", "88888", "Bill Country");
 
         // Act
         await _service.UpdateCustomerAddressesAsync(customer.Id, newShippingAddress, newBillingAddress);
 
         // Assert
-        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        CustomerAggregateRoot updatedCustomer = _mockRepository.SavedCustomers.Last();
         Assert.Equal(newShippingAddress, updatedCustomer.DefaultShippingAddress);
         Assert.Equal(newBillingAddress, updatedCustomer.DefaultBillingAddress);
         Assert.True(_mockServiceLogger.ContainsMessage($"Successfully updated addresses for customer {customer.Id}", LogLevel.Information));
@@ -1071,11 +1071,11 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task UpdateCustomerAddressesAsync_CustomerNotFound_ThrowsException()
     {
         // Arrange
-        var nonExistentCustomerId = Guid.NewGuid();
-        var address = TestDataBuilder.CreateAddress();
+        Guid nonExistentCustomerId = Guid.NewGuid();
+        Address address = TestDataBuilder.CreateAddress();
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _service.UpdateCustomerAddressesAsync(nonExistentCustomerId, address, address));
 
         Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
@@ -1089,8 +1089,8 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task PlaceOrderForExistingCustomerAsync_Success_PlacesOrder()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
-        var defaultAddress = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        Address defaultAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
 
         // Add an initial order to the customer
@@ -1098,22 +1098,22 @@ public class CustomerApplicationServiceTests : IDisposable
 
         _mockRepository.AddCustomer(customer);
 
-        var orderItems = TestDataBuilder.CreateOrderItems(2);
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems(2);
 
         // Act
-        var orderId = await _service.PlaceOrderForExistingCustomerAsync(customer.Id, null, null, orderItems);
+        Guid orderId = await _service.PlaceOrderForExistingCustomerAsync(customer.Id, null, null, orderItems);
 
         // Assert
         Assert.NotEqual(Guid.Empty, orderId);
 
         // Get the last saved state of this specific customer
-        var updatedCustomer = _mockRepository.SavedCustomers
+        CustomerAggregateRoot updatedCustomer = _mockRepository.SavedCustomers
             .Where(c => c.Id == customer.Id)
             .Last();
 
         Assert.Equal(2, updatedCustomer.Orders.Count); // One from setup, one new
 
-        var newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
+        Order? newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
         Assert.NotNull(newOrder);
         Assert.Equal(2, newOrder.Items.Count);
         Assert.Equal(defaultAddress, newOrder.ShippingAddress); // Used default
@@ -1126,22 +1126,22 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task PlaceOrderForExistingCustomerAsync_WithSpecificAddresses_UsesProvidedAddresses()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
-        var defaultAddress = TestDataBuilder.CreateAddress();
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        Address defaultAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
         _mockRepository.AddCustomer(customer);
 
-        var specificShipping = TestDataBuilder.CreateAddress("999 Ship St", "Ship City", "SH", "77777", "Ship Country");
-        var specificBilling = TestDataBuilder.CreateAddress("888 Bill St", "Bill City", "BL", "66666", "Bill Country");
-        var orderItems = TestDataBuilder.CreateOrderItems(1);
+        Address specificShipping = TestDataBuilder.CreateAddress("999 Ship St", "Ship City", "SH", "77777", "Ship Country");
+        Address specificBilling = TestDataBuilder.CreateAddress("888 Bill St", "Bill City", "BL", "66666", "Bill Country");
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems(1);
 
         // Act
-        var orderId = await _service.PlaceOrderForExistingCustomerAsync(
+        Guid orderId = await _service.PlaceOrderForExistingCustomerAsync(
             customer.Id, specificShipping, specificBilling, orderItems);
 
         // Assert
-        var updatedCustomer = _mockRepository.SavedCustomers.Last();
-        var newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
+        CustomerAggregateRoot updatedCustomer = _mockRepository.SavedCustomers.Last();
+        Order? newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
         Assert.NotNull(newOrder);
         Assert.Equal(specificShipping, newOrder.ShippingAddress);
         Assert.Equal(specificBilling, newOrder.BillingAddress);
@@ -1151,12 +1151,12 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task PlaceOrderForExistingCustomerAsync_CustomerNotFound_ThrowsException()
     {
         // Arrange
-        var nonExistentCustomerId = Guid.NewGuid();
-        var address = TestDataBuilder.CreateAddress();
-        var orderItems = TestDataBuilder.CreateOrderItems();
+        Guid nonExistentCustomerId = Guid.NewGuid();
+        Address address = TestDataBuilder.CreateAddress();
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems();
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _service.PlaceOrderForExistingCustomerAsync(nonExistentCustomerId, address, address, orderItems));
 
         Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
@@ -1167,19 +1167,19 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task AddOrderItemsToExistingOrderAsync_Success_AddsItems()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
-        var address = TestDataBuilder.CreateAddress();
-        var order = customer.PlaceNewOrder(address, address);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        Address address = TestDataBuilder.CreateAddress();
+        Order order = customer.PlaceNewOrder(address, address);
         _mockRepository.AddCustomer(customer);
 
-        var newItems = TestDataBuilder.CreateOrderItems(2);
+        List<(string product, int quantity, decimal price)> newItems = TestDataBuilder.CreateOrderItems(2);
 
         // Act
         await _service.AddOrderItemsToExistingOrderAsync(customer.Id, order.Id, newItems);
 
         // Assert
         Assert.Equal(2, _mockRepository.SavedCustomers.Count); // Original + updated
-        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        CustomerAggregateRoot updatedCustomer = _mockRepository.SavedCustomers.Last();
         Assert.Equal(2, updatedCustomer.Orders[0].Items.Count);
         Assert.True(_mockServiceLogger.ContainsMessage($"Successfully added items to order {order.Id}", LogLevel.Information));
     }
@@ -1188,12 +1188,12 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task AddOrderItemsToExistingOrderAsync_CustomerNotFound_ThrowsInvalidOperationException()
     {
         // Arrange
-        var nonExistentCustomerId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        var items = TestDataBuilder.CreateOrderItems();
+        Guid nonExistentCustomerId = Guid.NewGuid();
+        Guid orderId = Guid.NewGuid();
+        List<(string product, int quantity, decimal price)> items = TestDataBuilder.CreateOrderItems();
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _service.AddOrderItemsToExistingOrderAsync(nonExistentCustomerId, orderId, items));
 
         Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
@@ -1204,13 +1204,13 @@ public class CustomerApplicationServiceTests : IDisposable
     public async Task AddOrderItemsToExistingOrderAsync_Exception_LogsErrorAndRethrows()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
-        var address = TestDataBuilder.CreateAddress();
-        var order = customer.PlaceNewOrder(address, address);
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        Address address = TestDataBuilder.CreateAddress();
+        Order order = customer.PlaceNewOrder(address, address);
         _mockRepository.AddCustomer(customer);
 
-        var nonExistentOrderId = Guid.NewGuid();
-        var items = TestDataBuilder.CreateOrderItems();
+        Guid nonExistentOrderId = Guid.NewGuid();
+        List<(string product, int quantity, decimal price)> items = TestDataBuilder.CreateOrderItems();
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -1224,16 +1224,16 @@ public class CustomerApplicationServiceTests : IDisposable
     {
         // Arrange
         const string customerName = "Event Test Customer";
-        var shippingAddress = TestDataBuilder.CreateAddress();
-        var billingAddress = TestDataBuilder.CreateAddress();
-        var orderItems = TestDataBuilder.CreateOrderItems(1);
+        Address shippingAddress = TestDataBuilder.CreateAddress();
+        Address billingAddress = TestDataBuilder.CreateAddress();
+        List<(string product, int quantity, decimal price)> orderItems = TestDataBuilder.CreateOrderItems(1);
 
         // Act
         await _service.CreateCustomerAndPlaceOrderAsync(customerName, shippingAddress, billingAddress, orderItems);
 
         // Assert
         Assert.NotEmpty(_mockEventDispatcher.DispatchedEvents);
-        var eventTypes = _mockEventDispatcher.DispatchedEvents.Select(e => e.GetType()).ToList();
+        List<Type> eventTypes = [.. _mockEventDispatcher.DispatchedEvents.Select(e => e.GetType())];
         Assert.Contains(typeof(CustomerCreatedEvent), eventTypes);
         Assert.Contains(typeof(CustomerAddressUpdatedEvent), eventTypes);
         Assert.Contains(typeof(OrderPlacedEvent), eventTypes);
@@ -1249,7 +1249,7 @@ public class CustomerApplicationServiceTests : IDisposable
 
         public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            _customers.TryGetValue(id, out var customer);
+            _customers.TryGetValue(id, out CustomerAggregateRoot? customer);
             return Task.FromResult(customer);
         }
 
@@ -1283,7 +1283,7 @@ public class CustomerApplicationServiceTests : IDisposable
     // Add this to your MyClassLibrary.Tests.cs file
 
     // Missing test data variable
-    private static readonly List<(string product, int quantity, decimal price)> emptyOrderItems = new();
+    private static readonly List<(string product, int quantity, decimal price)> emptyOrderItems = [];
 
     // Additional edge case tests you might want to add
 
@@ -1293,7 +1293,7 @@ public class CustomerApplicationServiceTests : IDisposable
         public void DefaultValues_AreSetCorrectly()
         {
             // Arrange & Act
-            var businessRules = new CustomerBusinessRules();
+            CustomerBusinessRules businessRules = new();
 
             // Assert
             Assert.Equal(10, businessRules.MaxOutstandingOrders);
@@ -1304,7 +1304,7 @@ public class CustomerApplicationServiceTests : IDisposable
         public void CanSetCustomValues()
         {
             // Arrange & Act
-            var businessRules = new CustomerBusinessRules
+            CustomerBusinessRules businessRules = new()
             {
                 MaxOutstandingOrders = 5,
                 OutstandingOrderDays = 60
@@ -1326,8 +1326,8 @@ public class CustomerApplicationServiceTests : IDisposable
         {
             InMemoryCustomerAggregateRepository.ClearRepository();
 
-            var services = new ServiceCollection();
-            var configuration = new ConfigurationBuilder()
+            ServiceCollection services = new();
+            IConfigurationRoot configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                 {"CustomerBusinessRules:MaxOutstandingOrders", "3"},
@@ -1353,40 +1353,37 @@ public class CustomerApplicationServiceTests : IDisposable
         {
             // Arrange
             const string customerName = "Integration Test Customer";
-            var shippingAddress = TestDataBuilder.CreateAddress();
-            var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
-            var initialItems = TestDataBuilder.CreateOrderItems(2);
+            Address shippingAddress = TestDataBuilder.CreateAddress();
+            Address billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+            List<(string product, int quantity, decimal price)> initialItems = TestDataBuilder.CreateOrderItems(2);
 
             // Act - Create customer with initial order
-            var customerId = await _applicationService.CreateCustomerAndPlaceOrderAsync(
+            Guid customerId = await _applicationService.CreateCustomerAndPlaceOrderAsync(
                 customerName, shippingAddress, billingAddress, initialItems);
 
             // Update addresses
-            var newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
+            Address newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
             await _applicationService.UpdateCustomerAddressesAsync(customerId, newShippingAddress, billingAddress);
 
             // Place second order
-            var secondOrderItems = TestDataBuilder.CreateOrderItems(1);
-            var secondOrderId = await _applicationService.PlaceOrderForExistingCustomerAsync(
+            List<(string product, int quantity, decimal price)> secondOrderItems = TestDataBuilder.CreateOrderItems(1);
+            Guid secondOrderId = await _applicationService.PlaceOrderForExistingCustomerAsync(
                 customerId, null, null, secondOrderItems);
 
             // Add items to second order
-            var additionalItems = new List<(string product, int quantity, decimal price)>
-        {
-            ("Extra Product", 3, 25.99m)
-        };
+            List<(string product, int quantity, decimal price)> additionalItems = [("Extra Product", 3, 25.99m)];
             await _applicationService.AddOrderItemsToExistingOrderAsync(customerId, secondOrderId, additionalItems);
 
             // Assert
-            var repository = _serviceProvider.GetRequiredService<ICustomerAggregateRepository>();
-            var customer = await repository.GetByIdAsync(customerId);
+            ICustomerAggregateRepository repository = _serviceProvider.GetRequiredService<ICustomerAggregateRepository>();
+            CustomerAggregateRoot? customer = await repository.GetByIdAsync(customerId);
 
             Assert.NotNull(customer);
             Assert.Equal(customerName, customer.Name);
             Assert.Equal(newShippingAddress, customer.DefaultShippingAddress);
             Assert.Equal(2, customer.Orders.Count);
 
-            var secondOrder = customer.Orders.FirstOrDefault(o => o.Id == secondOrderId);
+            Order? secondOrder = customer.Orders.FirstOrDefault(o => o.Id == secondOrderId);
             Assert.NotNull(secondOrder);
             Assert.Equal(2, secondOrder.Items.Count); // 1 initial + 1 additional
         }
@@ -1396,11 +1393,11 @@ public class CustomerApplicationServiceTests : IDisposable
         {
             // Arrange
             const string customerName = "Max Orders Test";
-            var address = TestDataBuilder.CreateAddress();
-            var items = TestDataBuilder.CreateOrderItems(1);
+            Address address = TestDataBuilder.CreateAddress();
+            List<(string product, int quantity, decimal price)> items = TestDataBuilder.CreateOrderItems(1);
 
             // Create customer with first order
-            var customerId = await _applicationService.CreateCustomerAndPlaceOrderAsync(
+            Guid customerId = await _applicationService.CreateCustomerAndPlaceOrderAsync(
                 customerName, address, address, items);
 
             // Act - Place orders up to the limit (we already have 1, so place 2 more to reach 3)
@@ -1433,22 +1430,20 @@ public class CustomerApplicationServiceTests : IDisposable
         public async Task Repository_HandlesMultipleConcurrentOperations()
         {
             // Arrange
-            var repository = new InMemoryCustomerAggregateRepository(new MockLogger<InMemoryCustomerAggregateRepository>());
-            var customers = Enumerable.Range(1, 10)
-                .Select(i => TestDataBuilder.CreateCustomer($"Customer {i}"))
-                .ToList();
+            InMemoryCustomerAggregateRepository repository = new(new MockLogger<InMemoryCustomerAggregateRepository>());
+            List<CustomerAggregateRoot> customers = [.. Enumerable.Range(1, 10).Select(i => TestDataBuilder.CreateCustomer($"Customer {i}"))];
 
             // Act - Save all customers sequentially (the InMemoryRepository uses a static dictionary which isn't thread-safe)
-            foreach (var customer in customers)
+            foreach (CustomerAggregateRoot? customer in customers)
             {
                 await repository.SaveAsync(customer);
             }
 
             // Assert - All customers should be retrievable
-            var retrievedCustomers = new List<CustomerAggregateRoot?>();
-            foreach (var customer in customers)
+            List<CustomerAggregateRoot?> retrievedCustomers = [];
+            foreach (CustomerAggregateRoot? customer in customers)
             {
-                var retrieved = await repository.GetByIdAsync(customer.Id);
+                CustomerAggregateRoot? retrieved = await repository.GetByIdAsync(customer.Id);
                 retrievedCustomers.Add(retrieved);
             }
 
@@ -1474,11 +1469,11 @@ public class CustomerApplicationServiceTests : IDisposable
         public void Order_ItemsCollection_IsReadOnly()
         {
             // Arrange
-            var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1),
+            Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1),
                 TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
 
             // Act & Assert
-            Assert.IsAssignableFrom<IReadOnlyList<OrderItem>>(order.Items);
+            Assert.IsType<IReadOnlyList<OrderItem>>(order.Items, exactMatch: false);
             // The Items property returns a ReadOnlyCollection, so direct modification should not be possible
         }
 
@@ -1486,7 +1481,7 @@ public class CustomerApplicationServiceTests : IDisposable
         public void Order_MultipleItemsSameProductSamePriceAcrossMultipleAdds_CombinesCorrectly()
         {
             // Arrange
-            var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1),
+            Order order = new(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1),
                 TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
 
             // Act - Add same product multiple times
@@ -1518,28 +1513,28 @@ public class CustomerApplicationServiceTests : IDisposable
         public void Orders_Collection_IsReadOnly()
         {
             // Arrange
-            var customer = TestDataBuilder.CreateCustomer();
+            CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer();
 
             // Act & Assert
-            Assert.IsAssignableFrom<IReadOnlyList<Order>>(customer.Orders);
+            Assert.IsType<IReadOnlyList<Order>>(customer.Orders, exactMatch: false);
         }
 
         [Fact]
         public void DomainEvents_Collection_IsReadOnly()
         {
             // Arrange
-            var customer = TestDataBuilder.CreateCustomer();
+            CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer();
 
             // Act & Assert
-            Assert.IsAssignableFrom<IReadOnlyList<DomainEvent>>(customer.DomainEvents);
+            Assert.IsType<IReadOnlyList<DomainEvent>>(customer.DomainEvents, exactMatch: false);
         }
 
         [Fact]
         public void UpdateDefaultAddresses_SameAddressForShippingAndBilling_BothEventsCreated()
         {
             // Arrange
-            var customer = TestDataBuilder.CreateCustomer();
-            var sameAddress = TestDataBuilder.CreateAddress();
+            CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer();
+            Address sameAddress = TestDataBuilder.CreateAddress();
             customer.ClearDomainEvents();
 
             // Act
@@ -1577,20 +1572,20 @@ public class LoggingDomainEventDispatcherTests
     public async Task DispatchAsync_SingleEvent_LogsCorrectly()
     {
         // Arrange
-        var customerId = Guid.NewGuid();
-        var @event = new CustomerCreatedEvent(
+        Guid customerId = Guid.NewGuid();
+        CustomerCreatedEvent @event = new(
             Guid.NewGuid(),
             DateTime.UtcNow,
             customerId,
             "Test Customer");
-        var events = new[] { @event };
+        CustomerCreatedEvent[] events = [@event];
 
         // Act
         await _dispatcher.DispatchAsync(events);
 
         // Assert
         Assert.Single(_mockLogger.LogEntries);
-        var logEntry = _mockLogger.LogEntries[0];
+        LogEntry logEntry = _mockLogger.LogEntries[0];
         Assert.Equal(LogLevel.Information, logEntry.LogLevel);
         // Don't check for exact DateTime string match
         Assert.Contains("Domain event dispatched:", logEntry.Message);
@@ -1603,16 +1598,16 @@ public class LoggingDomainEventDispatcherTests
     public async Task DispatchAsync_MultipleEvents_LogsAllEvents()
     {
         // Arrange
-        var customerId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
-        var events = new DomainEvent[]
-        {
+        Guid customerId = Guid.NewGuid();
+        Guid orderId = Guid.NewGuid();
+        DomainEvent[] events =
+        [
             new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, "Customer"),
             new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, orderId, DateTime.UtcNow,
                 TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress()),
             new OrderItemAddedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, orderId,
                 new OrderItem("Product", 1, 10m))
-        };
+        ];
 
         // Act
         await _dispatcher.DispatchAsync(events);
@@ -1628,7 +1623,7 @@ public class LoggingDomainEventDispatcherTests
     public async Task DispatchAsync_EmptyEventList_DoesNotLog()
     {
         // Arrange
-        var events = new List<DomainEvent>();
+        List<DomainEvent> events = [];
 
         // Act
         await _dispatcher.DispatchAsync(events);
@@ -1641,15 +1636,15 @@ public class LoggingDomainEventDispatcherTests
     public async Task DispatchAsync_WithCancellationToken_CompletesSuccessfully()
     {
         // Arrange
-        using var cts = new CancellationTokenSource();
-        var @event = new CustomerCreatedEvent(
+        using CancellationTokenSource cts = new();
+        CustomerCreatedEvent @event = new(
             Guid.NewGuid(),
             DateTime.UtcNow,
             Guid.NewGuid(),
             "Test Customer");
 
         // Act
-        await _dispatcher.DispatchAsync(new[] { @event }, cts.Token);
+        await _dispatcher.DispatchAsync([@event], cts.Token);
 
         // Assert
         Assert.Single(_mockLogger.LogEntries);
@@ -1659,18 +1654,18 @@ public class LoggingDomainEventDispatcherTests
     public async Task DispatchAsync_LogsEventTypeNameCorrectly()
     {
         // Arrange
-        var differentEvents = new DomainEvent[]
-        {
+        DomainEvent[] differentEvents =
+        [
             new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Customer"),
             new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow,
                 TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress())
-        };
+        ];
 
         // Act
         await _dispatcher.DispatchAsync(differentEvents);
 
         // Assert
-        var logMessages = _mockLogger.LogEntries.Select(e => e.Message).ToList();
+        List<string> logMessages = [.. _mockLogger.LogEntries.Select(e => e.Message)];
         Assert.Contains(logMessages, m => m.Contains("CustomerCreatedEvent"));
         Assert.Contains(logMessages, m => m.Contains("OrderPlacedEvent"));
     }
@@ -1705,10 +1700,10 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
     public async Task GetByIdAsync_NonExistentCustomer_ReturnsNull()
     {
         // Arrange
-        var customerId = Guid.NewGuid();
+        Guid customerId = Guid.NewGuid();
 
         // Act
-        var result = await _repository.GetByIdAsync(customerId);
+        CustomerAggregateRoot? result = await _repository.GetByIdAsync(customerId);
 
         // Assert
         Assert.Null(result);
@@ -1719,7 +1714,7 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
     public async Task SaveAsync_NewCustomer_SavesSuccessfully()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer("John Doe");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("John Doe");
 
         // Act
         await _repository.SaveAsync(customer);
@@ -1742,12 +1737,12 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
     public async Task GetByIdAsync_AfterSave_ReturnsCustomer()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer("Jane Doe");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("Jane Doe");
         await _repository.SaveAsync(customer);
         _mockLogger.Clear();
 
         // Act
-        var retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
+        CustomerAggregateRoot? retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
 
         // Assert
         Assert.NotNull(retrievedCustomer);
@@ -1760,11 +1755,11 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
     public async Task SaveAsync_ExistingCustomer_UpdatesSuccessfully()
     {
         // Arrange
-        var customer = TestDataBuilder.CreateCustomer("Initial Name");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("Initial Name");
         await _repository.SaveAsync(customer);
 
         // Modify the customer (add an order)
-        var address = TestDataBuilder.CreateAddress();
+        Address address = TestDataBuilder.CreateAddress();
         customer.PlaceNewOrder(address, address);
         _mockLogger.Clear();
 
@@ -1775,7 +1770,7 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
         Assert.True(_mockLogger.ContainsMessage("Updated customer aggregate", LogLevel.Information));
 
         // Verify the update persisted
-        var retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
+        CustomerAggregateRoot? retrievedCustomer = await _repository.GetByIdAsync(customer.Id);
         Assert.NotNull(retrievedCustomer);
         Assert.Single(retrievedCustomer.Orders);
     }
@@ -1784,15 +1779,15 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
     public async Task Repository_IsolatedBetweenInstances()
     {
         // Arrange
-        var repository1 = new InMemoryCustomerAggregateRepository(new MockLogger<InMemoryCustomerAggregateRepository>());
-        var repository2 = new InMemoryCustomerAggregateRepository(new MockLogger<InMemoryCustomerAggregateRepository>());
+        InMemoryCustomerAggregateRepository repository1 = new(new MockLogger<InMemoryCustomerAggregateRepository>());
+        InMemoryCustomerAggregateRepository repository2 = new(new MockLogger<InMemoryCustomerAggregateRepository>());
 
-        var customer = TestDataBuilder.CreateCustomer("Test Customer");
+        CustomerAggregateRoot customer = TestDataBuilder.CreateCustomer("Test Customer");
 
         // Act
         await repository1.SaveAsync(customer);
-        var result1 = await repository1.GetByIdAsync(customer.Id);
-        var result2 = await repository2.GetByIdAsync(customer.Id);
+        CustomerAggregateRoot? result1 = await repository1.GetByIdAsync(customer.Id);
+        CustomerAggregateRoot? result2 = await repository2.GetByIdAsync(customer.Id);
 
         // Assert - Both repositories share the same static storage
         Assert.NotNull(result1);
@@ -1809,26 +1804,26 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
         // Arrange
         // Create a new repository instance for this test
         InMemoryCustomerAggregateRepository.ClearRepository(); // Clear before starting
-        var testLogger = new MockLogger<InMemoryCustomerAggregateRepository>();
-        var testRepository = new InMemoryCustomerAggregateRepository(testLogger);
+        MockLogger<InMemoryCustomerAggregateRepository> testLogger = new();
+        InMemoryCustomerAggregateRepository testRepository = new(testLogger);
 
-        var customers = new[]
-        {
+        CustomerAggregateRoot[] customers =
+        [
         TestDataBuilder.CreateCustomer("Customer 1"),
         TestDataBuilder.CreateCustomer("Customer 2"),
         TestDataBuilder.CreateCustomer("Customer 3")
-    };
+    ];
 
         // Act
-        foreach (var customer in customers)
+        foreach (CustomerAggregateRoot? customer in customers)
         {
             await testRepository.SaveAsync(customer);
         }
 
         // Assert - All customers should be retrievable
-        foreach (var customer in customers)
+        foreach (CustomerAggregateRoot? customer in customers)
         {
-            var retrieved = await testRepository.GetByIdAsync(customer.Id);
+            CustomerAggregateRoot? retrieved = await testRepository.GetByIdAsync(customer.Id);
             Assert.NotNull(retrieved);
             Assert.Equal(customer.Name, retrieved.Name);
         }
@@ -1843,15 +1838,15 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersAllRequiredServices()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
 
         // Add required logging services
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Check all services are registered
         Assert.NotNull(serviceProvider.GetService<CustomerBusinessRules>());
@@ -1864,19 +1859,19 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersCorrectImplementations()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Check correct implementations
-        var repository = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository = serviceProvider.GetService<ICustomerAggregateRepository>();
         Assert.IsType<InMemoryCustomerAggregateRepository>(repository);
 
-        var eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
         Assert.IsType<LoggingDomainEventDispatcher>(eventDispatcher);
     }
 
@@ -1884,23 +1879,23 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_ConfiguresBusinessRulesFromConfiguration()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configValues = new Dictionary<string, string?>
+        ServiceCollection services = new();
+        Dictionary<string, string?> configValues = new()
         {
             {"CustomerBusinessRules:MaxOutstandingOrders", "5"},
             {"CustomerBusinessRules:OutstandingOrderDays", "45"}
         };
-        var configuration = new ConfigurationBuilder()
+        IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configValues)
             .Build();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        var businessRules = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.NotNull(businessRules);
         Assert.Equal(5, businessRules.MaxOutstandingOrders);
         Assert.Equal(45, businessRules.OutstandingOrderDays);
@@ -1910,25 +1905,25 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersSingletonServices()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Verify singleton behavior
-        var businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
-        var businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.Same(businessRules1, businessRules2);
 
-        var repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
-        var repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
         Assert.Same(repository1, repository2);
 
-        var dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
-        var dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
         Assert.Same(dispatcher1, dispatcher2);
     }
 
@@ -1936,17 +1931,17 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_RegistersTransientApplicationService()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Verify transient behavior
-        var service1 = serviceProvider.GetService<CustomerApplicationService>();
-        var service2 = serviceProvider.GetService<CustomerApplicationService>();
+        CustomerApplicationService? service1 = serviceProvider.GetService<CustomerApplicationService>();
+        CustomerApplicationService? service2 = serviceProvider.GetService<CustomerApplicationService>();
         Assert.NotSame(service1, service2);
     }
 
@@ -1954,16 +1949,16 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_CanResolveAllDependenciesForApplicationService()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - This will throw if any dependencies are missing
-        var applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
+        CustomerApplicationService applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
         Assert.NotNull(applicationService);
     }
 
@@ -1971,16 +1966,16 @@ public class ServiceCollectionExtensionsTests
     public void AddCustomerDomain_DefaultBusinessRulesWhenNotInConfiguration()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = new ConfigurationBuilder().Build(); // Empty configuration
+        ServiceCollection services = new();
+        IConfigurationRoot configuration = new ConfigurationBuilder().Build(); // Empty configuration
         services.AddLogging();
 
         // Act
         services.AddCustomerDomain(configuration);
-        var serviceProvider = services.BuildServiceProvider();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        var businessRules = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.NotNull(businessRules);
         Assert.Equal(10, businessRules.MaxOutstandingOrders); // Default value
         Assert.Equal(30, businessRules.OutstandingOrderDays); // Default value
@@ -1988,7 +1983,7 @@ public class ServiceCollectionExtensionsTests
 
     private static IConfiguration CreateConfiguration()
     {
-        var configValues = new Dictionary<string, string?>
+        Dictionary<string, string?> configValues = new()
         {
             {"CustomerBusinessRules:MaxOutstandingOrders", "10"},
             {"CustomerBusinessRules:OutstandingOrderDays", "30"}

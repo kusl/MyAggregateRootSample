@@ -181,8 +181,8 @@ public class CustomerAggregateRoot
 
     public void UpdateDefaultAddresses(Address? shippingAddress, Address? billingAddress)
     {
-        var oldShipping = DefaultShippingAddress;
-        var oldBilling = DefaultBillingAddress;
+        Address? oldShipping = DefaultShippingAddress;
+        Address? oldBilling = DefaultBillingAddress;
 
         DefaultShippingAddress = shippingAddress;
         DefaultBillingAddress = billingAddress;
@@ -213,8 +213,8 @@ public class CustomerAggregateRoot
     public Order PlaceNewOrder(Address? shippingAddress = null, Address? billingAddress = null)
     {
         // Use provided addresses or fall back to defaults
-        var orderShippingAddress = shippingAddress ?? DefaultShippingAddress;
-        var orderBillingAddress = billingAddress ?? DefaultBillingAddress;
+        Address? orderShippingAddress = shippingAddress ?? DefaultShippingAddress;
+        Address? orderBillingAddress = billingAddress ?? DefaultBillingAddress;
 
         if (orderShippingAddress == null)
             throw new InvalidOperationException("Shipping address is required to place an order.");
@@ -481,7 +481,7 @@ public class LoggingDomainEventDispatcher(ILogger<LoggingDomainEventDispatcher> 
 public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggregateRepository> logger) : ICustomerAggregateRepository
 {
     private static readonly Dictionary<Guid, CustomerAggregateRoot> _customers = [];
-    private static readonly object _lock = new object(); // Add lock for thread safety
+    private static readonly object _lock = new(); // Add lock for thread safety
     private readonly ILogger<InMemoryCustomerAggregateRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
