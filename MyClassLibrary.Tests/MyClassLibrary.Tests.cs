@@ -1082,6 +1082,9 @@ public class CustomerApplicationServiceTests : IDisposable
         Assert.True(_mockServiceLogger.ContainsMessage($"Customer {nonExistentCustomerId} not found", LogLevel.Warning));
     }
 
+    // 1. Fix the PlaceOrderForExistingCustomerAsync_Success_PlacesOrder test:
+    // Replace this test method with:
+
     [Fact]
     public async Task PlaceOrderForExistingCustomerAsync_Success_PlacesOrder()
     {
@@ -1089,6 +1092,10 @@ public class CustomerApplicationServiceTests : IDisposable
         var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
         var defaultAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
+
+        // Add an initial order to the customer
+        customer.PlaceNewOrder(defaultAddress, defaultAddress);
+
         _mockRepository.AddCustomer(customer);
 
         var orderItems = TestDataBuilder.CreateOrderItems(2);
@@ -1414,7 +1421,8 @@ public class CustomerApplicationServiceTests : IDisposable
             InMemoryCustomerAggregateRepository.ClearRepository();
         }
 
-        // Replace the Repository_HandlesMultipleConcurrentOperations test with this fixed version:
+        // 3. Fix the Repository_HandlesMultipleConcurrentOperations test:
+        // Replace this test method with:
 
         [Fact]
         public async Task Repository_HandlesMultipleConcurrentOperations()
@@ -1444,8 +1452,8 @@ public class CustomerApplicationServiceTests : IDisposable
         }
     }
 
-    // Additional test for Order edge cases
-    public class OrderAdditionalTests : IDisposable
+        // Additional test for Order edge cases
+        public class OrderAdditionalTests : IDisposable
     {
         public OrderAdditionalTests()
         {
@@ -1788,16 +1796,19 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
         Assert.Equal(customer.Id, result2.Id);
     }
 
+    // 2. Fix the SaveAsync_MultipleCustomers_SavesAll test:
+    // Replace this test method with:
+
     [Fact]
     public async Task SaveAsync_MultipleCustomers_SavesAll()
     {
         // Arrange
         var customers = new[]
         {
-            TestDataBuilder.CreateCustomer("Customer 1"),
-            TestDataBuilder.CreateCustomer("Customer 2"),
-            TestDataBuilder.CreateCustomer("Customer 3")
-        };
+        TestDataBuilder.CreateCustomer("Customer 1"),
+        TestDataBuilder.CreateCustomer("Customer 2"),
+        TestDataBuilder.CreateCustomer("Customer 3")
+    };
 
         // Act
         foreach (var customer in customers)
@@ -1805,7 +1816,10 @@ public class InMemoryCustomerAggregateRepositoryTests : IDisposable
             await _repository.SaveAsync(customer);
         }
 
-        // Assert
+        // Clear the logger to avoid confusion
+        _mockLogger.Clear();
+
+        // Assert - All customers should be retrievable
         foreach (var customer in customers)
         {
             var retrieved = await _repository.GetByIdAsync(customer.Id);
