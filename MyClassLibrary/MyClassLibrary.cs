@@ -177,6 +177,8 @@ public class CustomerAggregateRoot
         AddDomainEvent(new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Id, Name));
     }
 
+    // Replace the UpdateDefaultAddresses method in CustomerAggregateRoot with this fixed version:
+
     public void UpdateDefaultAddresses(Address? shippingAddress, Address? billingAddress)
     {
         var oldShipping = DefaultShippingAddress;
@@ -188,10 +190,10 @@ public class CustomerAggregateRoot
         if (oldShipping != shippingAddress && shippingAddress != null)
         {
             AddDomainEvent(new CustomerAddressUpdatedEvent(
-                Guid.NewGuid(), 
-                DateTime.UtcNow, 
-                Id, 
-                oldShipping ?? new Address("", "", "", "", ""), 
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                Id,
+                oldShipping!, // Use null-forgiving operator since we only create event when new address is not null
                 shippingAddress));
             _logger?.LogInformation("Updated shipping address for customer {CustomerId}", Id);
         }
@@ -199,10 +201,10 @@ public class CustomerAggregateRoot
         if (oldBilling != billingAddress && billingAddress != null)
         {
             AddDomainEvent(new CustomerAddressUpdatedEvent(
-                Guid.NewGuid(), 
-                DateTime.UtcNow, 
-                Id, 
-                oldBilling ?? new Address("", "", "", "", ""), 
+                Guid.NewGuid(),
+                DateTime.UtcNow,
+                Id,
+                oldBilling!, // Use null-forgiving operator since we only create event when new address is not null
                 billingAddress));
             _logger?.LogInformation("Updated billing address for customer {CustomerId}", Id);
         }
