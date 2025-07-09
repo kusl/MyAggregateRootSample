@@ -1735,5 +1735,252 @@ public class ServiceCollectionExtensionsTests
         var billingAddress = TestDataBuilder.CreateAddress();
         List<(string product, int quantity, decimal price)> emptyOrderItems = [];
 
+// Act
+        var customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName, shippingAddress, billingAddress, emptyOrderItems);
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, customerId);
+        var savedCustomer = _mockRepository.SavedCustomers.First();
+        Assert.Single(savedCustomer.Orders);
+        Assert.Empty(savedCustomer.Orders[0].Items);
+    }
+
+    [Fact]
+    public async Task CreateCustomerAndPlaceOrderAsync_Exception_LogsErrorAndRethrows()
+    {
+        // Arrange
+        const string customerName = "Error Customer";
+        var shippingAddress = TestDataBuilder.CreateAddress();
+        var billingAddress = TestDataBuilder.CreateAddress();
+        var orderItems = TestDataBuilder.CreateOrderItems();
+        _mockRepository.ThrowOnSave = true;
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.CreateCustomerAndPlaceOrderAsync(customerName, shippingAddress, billingAddress, orderItems));
+
+        Assert.True(_mockServiceLogger.ContainsMessage($"Failed to create customer and place order for {customerName}", LogLevel.Error));
+    }
+
+    [Fact]
+    public async Task UpdateCustomerAddressesAsync_Success_UpdatesAddresses()
+    {
+        // Arrange
+        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        _mockRepository.AddCustomer(customer);
+        
+        var newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
+        var newBillingAddress = TestDataBuilder.CreateAddress("321 Bill St", "Bill City", "BC", "88888", "Bill Country");
+
         // Act
-        var customerId = await _service.CreateCustomerAndPlaceOrderAsync(customerName,
+        await _service.UpdateCustomerAddressesAsync(customer.Id, newShippingAddress, newBillingAddress);
+
+        // Assert
+        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        Assert.Equal(newShippingAddress, updatedCustomer.DefaultShippingAddress);
+        Assert.Equal(newBillingAddress, updatedCustomer.DefaultBillingAddress);
+        Assert.True(_mockServiceLogger.ContainsMessage($"Successfully updated addresses for customer {customer.Id}", LogLevel.Information));
+    }
+
+    [Fact]
+    public async Task UpdateCustomerAddressesAsync_CustomerNotFound_ThrowsException()
+    {
+        // Arrange
+        var nonExistentCustomerId = Guid.NewGuid();
+        var address = TestDataBuilder.CreateAddress();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.UpdateCustomerAddressesAsync(nonExistentCustomerId, address, address));
+
+        Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
+        Assert.True(_mockServiceLogger.ContainsMessage($"Customer {nonExistentCustomerId} not found", LogLevel.Warning));
+    }
+
+    [Fact]
+    public async Task PlaceOrderForExistingCustomerAsync_Success_PlacesOrder()
+    {
+        // Arrange
+        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        var defaultAddress = TestDataBuilder.CreateAddress();
+        customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
+        _mockRepository.AddCustomer(customer);
+        
+        var orderItems = TestDataBuilder.CreateOrderItems(2);
+
+        // Act
+        var orderId = await _service.PlaceOrderForExistingCustomerAsync(customer.Id, null, null, orderItems);
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, orderId);
+        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        Assert.Equal(2, updatedCustomer.Orders.Count); // One from setup, one new
+        
+        var newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
+        Assert.NotNull(newOrder);
+        Assert.Equal(2, newOrder.Items.Count);
+        Assert.Equal(defaultAddress, newOrder.ShippingAddress); // Used default
+        Assert.Equal(defaultAddress, newOrder.BillingAddress); // Used default
+        
+        Assert.True(_mockServiceLogger.ContainsMessage($"Successfully placed order {orderId}", LogLevel.Information));
+    }
+
+    [Fact]
+    public async Task PlaceOrderForExistingCustomerAsync_WithSpecificAddresses_UsesProvidedAddresses()
+    {
+        // Arrange
+        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        var defaultAddress = TestDataBuilder.CreateAddress();
+        customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
+        _mockRepository.AddCustomer(customer);
+        
+        var specificShipping = TestDataBuilder.CreateAddress("999 Ship St", "Ship City", "SH", "77777", "Ship Country");
+        var specificBilling = TestDataBuilder.CreateAddress("888 Bill St", "Bill City", "BL", "66666", "Bill Country");
+        var orderItems = TestDataBuilder.CreateOrderItems(1);
+
+        // Act
+        var orderId = await _service.PlaceOrderForExistingCustomerAsync(
+            customer.Id, specificShipping, specificBilling, orderItems);
+
+        // Assert
+        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        var newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
+        Assert.NotNull(newOrder);
+        Assert.Equal(specificShipping, newOrder.ShippingAddress);
+        Assert.Equal(specificBilling, newOrder.BillingAddress);
+    }
+
+    [Fact]
+    public async Task PlaceOrderForExistingCustomerAsync_CustomerNotFound_ThrowsException()
+    {
+        // Arrange
+        var nonExistentCustomerId = Guid.NewGuid();
+        var address = TestDataBuilder.CreateAddress();
+        var orderItems = TestDataBuilder.CreateOrderItems();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.PlaceOrderForExistingCustomerAsync(nonExistentCustomerId, address, address, orderItems));
+
+        Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
+        Assert.True(_mockServiceLogger.ContainsMessage($"Customer {nonExistentCustomerId} not found", LogLevel.Warning));
+    }
+
+    [Fact]
+    public async Task AddOrderItemsToExistingOrderAsync_Success_AddsItems()
+    {
+        // Arrange
+        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        var address = TestDataBuilder.CreateAddress();
+        var order = customer.PlaceNewOrder(address, address);
+        _mockRepository.AddCustomer(customer);
+
+        var newItems = TestDataBuilder.CreateOrderItems(2);
+
+        // Act
+        await _service.AddOrderItemsToExistingOrderAsync(customer.Id, order.Id, newItems);
+
+        // Assert
+        Assert.Equal(2, _mockRepository.SavedCustomers.Count); // Original + updated
+        var updatedCustomer = _mockRepository.SavedCustomers.Last();
+        Assert.Equal(2, updatedCustomer.Orders[0].Items.Count);
+        Assert.True(_mockServiceLogger.ContainsMessage($"Successfully added items to order {order.Id}", LogLevel.Information));
+    }
+
+    [Fact]
+    public async Task AddOrderItemsToExistingOrderAsync_CustomerNotFound_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var nonExistentCustomerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var items = TestDataBuilder.CreateOrderItems();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.AddOrderItemsToExistingOrderAsync(nonExistentCustomerId, orderId, items));
+
+        Assert.Contains($"Customer {nonExistentCustomerId} not found", exception.Message);
+        Assert.True(_mockServiceLogger.ContainsMessage($"Customer {nonExistentCustomerId} not found", LogLevel.Warning));
+    }
+
+    [Fact]
+    public async Task AddOrderItemsToExistingOrderAsync_Exception_LogsErrorAndRethrows()
+    {
+        // Arrange
+        var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
+        var address = TestDataBuilder.CreateAddress();
+        var order = customer.PlaceNewOrder(address, address);
+        _mockRepository.AddCustomer(customer);
+
+        var nonExistentOrderId = Guid.NewGuid();
+        var items = TestDataBuilder.CreateOrderItems();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.AddOrderItemsToExistingOrderAsync(customer.Id, nonExistentOrderId, items));
+
+        Assert.True(_mockServiceLogger.ContainsMessage($"Failed to add items to order {nonExistentOrderId}", LogLevel.Error));
+    }
+
+    [Fact]
+    public async Task CreateCustomerAndPlaceOrderAsync_DomainEventsAreDispatched()
+    {
+        // Arrange
+        const string customerName = "Event Test Customer";
+        var shippingAddress = TestDataBuilder.CreateAddress();
+        var billingAddress = TestDataBuilder.CreateAddress();
+        var orderItems = TestDataBuilder.CreateOrderItems(1);
+
+        // Act
+        await _service.CreateCustomerAndPlaceOrderAsync(customerName, shippingAddress, billingAddress, orderItems);
+
+        // Assert
+        Assert.NotEmpty(_mockEventDispatcher.DispatchedEvents);
+        var eventTypes = _mockEventDispatcher.DispatchedEvents.Select(e => e.GetType()).ToList();
+        Assert.Contains(typeof(CustomerCreatedEvent), eventTypes);
+        Assert.Contains(typeof(CustomerAddressUpdatedEvent), eventTypes);
+        Assert.Contains(typeof(OrderPlacedEvent), eventTypes);
+        Assert.Contains(typeof(OrderItemAddedEvent), eventTypes);
+    }
+
+    // Mock implementations for testing
+    private class MockCustomerRepository : ICustomerAggregateRepository
+    {
+        public List<CustomerAggregateRoot> SavedCustomers { get; } = [];
+        private readonly Dictionary<Guid, CustomerAggregateRoot> _customers = [];
+        public bool ThrowOnSave { get; set; }
+
+        public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            _customers.TryGetValue(id, out var customer);
+            return Task.FromResult(customer);
+        }
+
+        public Task SaveAsync(CustomerAggregateRoot customer, CancellationToken cancellationToken = default)
+        {
+            if (ThrowOnSave)
+                throw new InvalidOperationException("Save operation failed");
+
+            SavedCustomers.Add(customer);
+            _customers[customer.Id] = customer;
+            return Task.CompletedTask;
+        }
+
+        public void AddCustomer(CustomerAggregateRoot customer)
+        {
+            _customers[customer.Id] = customer;
+            SavedCustomers.Add(customer);
+        }
+    }
+
+    private class MockDomainEventDispatcher : IDomainEventDispatcher
+    {
+        public List<DomainEvent> DispatchedEvents { get; } = [];
+
+        public Task DispatchAsync(IEnumerable<DomainEvent> events, CancellationToken cancellationToken = default)
+        {
+            DispatchedEvents.AddRange(events);
+            return Task.CompletedTask;
+        }
+    }
+}
