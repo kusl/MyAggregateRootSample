@@ -1268,6 +1268,267 @@ public class CustomerApplicationServiceTests : IDisposable
             return Task.CompletedTask;
         }
     }
+    // Add this to your MyClassLibrary.Tests.cs file
+
+    // Missing test data variable
+    private static readonly List<(string product, int quantity, decimal price)> emptyOrderItems = new();
+
+    // Additional edge case tests you might want to add
+
+    public class CustomerBusinessRulesTests
+    {
+        [Fact]
+        public void DefaultValues_AreSetCorrectly()
+        {
+            // Arrange & Act
+            var businessRules = new CustomerBusinessRules();
+
+            // Assert
+            Assert.Equal(10, businessRules.MaxOutstandingOrders);
+            Assert.Equal(30, businessRules.OutstandingOrderDays);
+        }
+
+        [Fact]
+        public void CanSetCustomValues()
+        {
+            // Arrange & Act
+            var businessRules = new CustomerBusinessRules
+            {
+                MaxOutstandingOrders = 5,
+                OutstandingOrderDays = 60
+            };
+
+            // Assert
+            Assert.Equal(5, businessRules.MaxOutstandingOrders);
+            Assert.Equal(60, businessRules.OutstandingOrderDays);
+        }
+    }
+
+    // Additional integration tests
+    public class IntegrationTests : IDisposable
+    {
+        private readonly ServiceProvider _serviceProvider;
+        private readonly CustomerApplicationService _applicationService;
+
+        public IntegrationTests()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+
+            var services = new ServiceCollection();
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                {"CustomerBusinessRules:MaxOutstandingOrders", "3"},
+                {"CustomerBusinessRules:OutstandingOrderDays", "30"}
+                })
+                .Build();
+
+            services.AddLogging();
+            services.AddCustomerDomain(configuration);
+
+            _serviceProvider = services.BuildServiceProvider();
+            _applicationService = _serviceProvider.GetRequiredService<CustomerApplicationService>();
+        }
+
+        public void Dispose()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+            _serviceProvider?.Dispose();
+        }
+
+        [Fact]
+        public async Task FullWorkflow_CreateCustomerPlaceOrdersAddItems_Success()
+        {
+            // Arrange
+            const string customerName = "Integration Test Customer";
+            var shippingAddress = TestDataBuilder.CreateAddress();
+            var billingAddress = TestDataBuilder.CreateAddress("456 Bill Ave", "Billing City", "BC", "54321", "Bill Country");
+            var initialItems = TestDataBuilder.CreateOrderItems(2);
+
+            // Act - Create customer with initial order
+            var customerId = await _applicationService.CreateCustomerAndPlaceOrderAsync(
+                customerName, shippingAddress, billingAddress, initialItems);
+
+            // Update addresses
+            var newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
+            await _applicationService.UpdateCustomerAddressesAsync(customerId, newShippingAddress, billingAddress);
+
+            // Place second order
+            var secondOrderItems = TestDataBuilder.CreateOrderItems(1);
+            var secondOrderId = await _applicationService.PlaceOrderForExistingCustomerAsync(
+                customerId, null, null, secondOrderItems);
+
+            // Add items to second order
+            var additionalItems = new List<(string product, int quantity, decimal price)>
+        {
+            ("Extra Product", 3, 25.99m)
+        };
+            await _applicationService.AddOrderItemsToExistingOrderAsync(customerId, secondOrderId, additionalItems);
+
+            // Assert
+            var repository = _serviceProvider.GetRequiredService<ICustomerAggregateRepository>();
+            var customer = await repository.GetByIdAsync(customerId);
+
+            Assert.NotNull(customer);
+            Assert.Equal(customerName, customer.Name);
+            Assert.Equal(newShippingAddress, customer.DefaultShippingAddress);
+            Assert.Equal(2, customer.Orders.Count);
+
+            var secondOrder = customer.Orders.FirstOrDefault(o => o.Id == secondOrderId);
+            Assert.NotNull(secondOrder);
+            Assert.Equal(2, secondOrder.Items.Count); // 1 initial + 1 additional
+        }
+
+        [Fact]
+        public async Task MaxOutstandingOrders_EnforcedAcrossService()
+        {
+            // Arrange
+            const string customerName = "Max Orders Test";
+            var address = TestDataBuilder.CreateAddress();
+            var items = TestDataBuilder.CreateOrderItems(1);
+
+            // Create customer with first order
+            var customerId = await _applicationService.CreateCustomerAndPlaceOrderAsync(
+                customerName, address, address, items);
+
+            // Act - Place orders up to the limit (we already have 1, so place 2 more to reach 3)
+            await _applicationService.PlaceOrderForExistingCustomerAsync(customerId, null, null, items);
+            await _applicationService.PlaceOrderForExistingCustomerAsync(customerId, null, null, items);
+
+            // Assert - Fourth order should fail
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _applicationService.PlaceOrderForExistingCustomerAsync(customerId, null, null, items));
+        }
+    }
+
+    // Performance/stress test example
+    public class PerformanceTests : IDisposable
+    {
+        public PerformanceTests()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+        }
+
+        public void Dispose()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+        }
+
+        [Fact]
+        public async Task Repository_HandlesMultipleConcurrentOperations()
+        {
+            // Arrange
+            var repository = new InMemoryCustomerAggregateRepository(new MockLogger<InMemoryCustomerAggregateRepository>());
+            var customers = Enumerable.Range(1, 10)
+                .Select(i => TestDataBuilder.CreateCustomer($"Customer {i}"))
+                .ToList();
+
+            // Act - Save all customers concurrently
+            var saveTasks = customers.Select(c => repository.SaveAsync(c)).ToList();
+            await Task.WhenAll(saveTasks);
+
+            // Assert - All customers should be retrievable
+            var retrieveTasks = customers.Select(c => repository.GetByIdAsync(c.Id)).ToList();
+            var retrievedCustomers = await Task.WhenAll(retrieveTasks);
+
+            Assert.All(retrievedCustomers, c => Assert.NotNull(c));
+            Assert.Equal(customers.Count, retrievedCustomers.Count(c => c != null));
+        }
+    }
+
+    // Additional test for Order edge cases
+    public class OrderAdditionalTests : IDisposable
+    {
+        public OrderAdditionalTests()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+        }
+
+        public void Dispose()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+        }
+
+        [Fact]
+        public void Order_ItemsCollection_IsReadOnly()
+        {
+            // Arrange
+            var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1),
+                TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+
+            // Act & Assert
+            Assert.IsAssignableFrom<IReadOnlyList<OrderItem>>(order.Items);
+            // The Items property returns a ReadOnlyCollection, so direct modification should not be possible
+        }
+
+        [Fact]
+        public void Order_MultipleItemsSameProductSamePriceAcrossMultipleAdds_CombinesCorrectly()
+        {
+            // Arrange
+            var order = new Order(Guid.NewGuid(), DateTime.UtcNow.AddHours(-1),
+                TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress());
+
+            // Act - Add same product multiple times
+            order.AddItem(new OrderItem("Product A", 1, 10.00m));
+            order.AddItem(new OrderItem("Product A", 2, 10.00m));
+            order.AddItem(new OrderItem("Product A", 3, 10.00m));
+
+            // Assert
+            Assert.Single(order.Items);
+            Assert.Equal(6, order.Items[0].Quantity); // 1 + 2 + 3
+            Assert.Equal(60.00m, order.TotalAmount);
+        }
+    }
+
+    // Additional tests for CustomerAggregateRoot edge cases
+    public class CustomerAggregateRootAdditionalTests : IDisposable
+    {
+        public CustomerAggregateRootAdditionalTests()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+        }
+
+        public void Dispose()
+        {
+            InMemoryCustomerAggregateRepository.ClearRepository();
+        }
+
+        [Fact]
+        public void Orders_Collection_IsReadOnly()
+        {
+            // Arrange
+            var customer = TestDataBuilder.CreateCustomer();
+
+            // Act & Assert
+            Assert.IsAssignableFrom<IReadOnlyList<Order>>(customer.Orders);
+        }
+
+        [Fact]
+        public void DomainEvents_Collection_IsReadOnly()
+        {
+            // Arrange
+            var customer = TestDataBuilder.CreateCustomer();
+
+            // Act & Assert
+            Assert.IsAssignableFrom<IReadOnlyList<DomainEvent>>(customer.DomainEvents);
+        }
+
+        [Fact]
+        public void UpdateDefaultAddresses_SameAddressForShippingAndBilling_BothEventsCreated()
+        {
+            // Arrange
+            var customer = TestDataBuilder.CreateCustomer();
+            var sameAddress = TestDataBuilder.CreateAddress();
+            customer.ClearDomainEvents();
+
+            // Act
+            customer.UpdateDefaultAddresses(sameAddress, sameAddress);
+
+            // Assert
+            Assert.Equal(2, customer.DomainEvents.Count);
+            Assert.All(customer.DomainEvents, e => Assert.IsType<CustomerAddressUpdatedEvent>(e));
+        }
+    }
 }
 
 // ========== INFRASTRUCTURE TESTS ==========
@@ -1709,3 +1970,4 @@ public class ServiceCollectionExtensionsTests
             .Build();
     }
 }
+
