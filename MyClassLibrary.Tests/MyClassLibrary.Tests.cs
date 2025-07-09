@@ -1053,7 +1053,7 @@ public class CustomerApplicationServiceTests : IDisposable
         // Arrange
         var customer = TestDataBuilder.CreateCustomer(businessRules: _businessRules, logger: _mockCustomerLogger);
         _mockRepository.AddCustomer(customer);
-        
+
         var newShippingAddress = TestDataBuilder.CreateAddress("789 New St", "New City", "NC", "99999", "New Country");
         var newBillingAddress = TestDataBuilder.CreateAddress("321 Bill St", "Bill City", "BC", "88888", "Bill Country");
 
@@ -1090,7 +1090,7 @@ public class CustomerApplicationServiceTests : IDisposable
         var defaultAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
         _mockRepository.AddCustomer(customer);
-        
+
         var orderItems = TestDataBuilder.CreateOrderItems(2);
 
         // Act
@@ -1100,13 +1100,13 @@ public class CustomerApplicationServiceTests : IDisposable
         Assert.NotEqual(Guid.Empty, orderId);
         var updatedCustomer = _mockRepository.SavedCustomers.Last();
         Assert.Equal(2, updatedCustomer.Orders.Count); // One from setup, one new
-        
+
         var newOrder = updatedCustomer.Orders.FirstOrDefault(o => o.Id == orderId);
         Assert.NotNull(newOrder);
         Assert.Equal(2, newOrder.Items.Count);
         Assert.Equal(defaultAddress, newOrder.ShippingAddress); // Used default
         Assert.Equal(defaultAddress, newOrder.BillingAddress); // Used default
-        
+
         Assert.True(_mockServiceLogger.ContainsMessage($"Successfully placed order {orderId}", LogLevel.Information));
     }
 
@@ -1118,7 +1118,7 @@ public class CustomerApplicationServiceTests : IDisposable
         var defaultAddress = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(defaultAddress, defaultAddress);
         _mockRepository.AddCustomer(customer);
-        
+
         var specificShipping = TestDataBuilder.CreateAddress("999 Ship St", "Ship City", "SH", "77777", "Ship Country");
         var specificBilling = TestDataBuilder.CreateAddress("888 Bill St", "Bill City", "BL", "66666", "Bill Country");
         var orderItems = TestDataBuilder.CreateOrderItems(1);
@@ -1442,9 +1442,10 @@ public class CustomerApplicationServiceTests : IDisposable
             Assert.All(retrievedCustomers, c => Assert.NotNull(c));
             Assert.Equal(customers.Count, retrievedCustomers.Count(c => c != null));
         }
+    }
 
-        // Additional test for Order edge cases
-        public class OrderAdditionalTests : IDisposable
+    // Additional test for Order edge cases
+    public class OrderAdditionalTests : IDisposable
     {
         public OrderAdditionalTests()
         {
@@ -1594,7 +1595,7 @@ public class LoggingDomainEventDispatcherTests
         var events = new DomainEvent[]
         {
             new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, "Customer"),
-            new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, orderId, DateTime.UtcNow, 
+            new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, orderId, DateTime.UtcNow,
                 TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress()),
             new OrderItemAddedEvent(Guid.NewGuid(), DateTime.UtcNow, customerId, orderId,
                 new OrderItem("Product", 1, 10m))
