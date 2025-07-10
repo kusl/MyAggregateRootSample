@@ -522,3 +522,224 @@ Based on your solid foundation in DDD and Clean Architecture, here are some grea
 • **Native AOT** - Experiment with ahead-of-time compilation for faster startup
 
 Which of these sounds most interesting to dive into next?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+What does domain driven development say about business rules? what is a business rule vs what is just validation? 
+
+context 
+
+public record OrderItem
+
+{
+
+    public string Product { get; }
+
+    public int Quantity { get; }
+
+    public decimal Price { get; }
+
+    public decimal LineTotal => Quantity * Price;
+
+    public OrderItem(string product, int quantity, decimal price)
+
+    {
+
+        if (string.IsNullOrWhiteSpace(product))
+
+        {
+
+            throw new ArgumentException("Product cannot be null or empty.", nameof(product));
+
+        }
+
+        if (quantity <= 0)
+
+        {
+
+            throw new ArgumentException("Quantity must be positive.", nameof(quantity));
+
+        }
+
+        if (price <= 0)
+
+        {
+
+            throw new ArgumentException("Price must be positive.", nameof(price));
+
+        }
+
+        Product = product.Trim();
+
+        Quantity = quantity;
+
+        Price = price;
+
+    }
+
+}
+
+Great question! DDD makes an important distinction between **business rules** and **validation**, though they often get conflated. Let me break this down:
+
+## Validation vs Business Rules
+
+**Validation** ensures data integrity and prevents invalid states:
+- Basic format checks (not null, positive numbers, valid email format)
+- Data type constraints
+- Structural invariants that must always be true
+
+**Business Rules** encode domain knowledge and business logic:
+- Rules that change based on business context
+- Rules that involve domain concepts and relationships
+- Rules that business experts would recognize and discuss
+
+## Your OrderItem Example
+
+What you have is mostly **validation**:
+
+```csharp
+// These are VALIDATION - ensuring data integrity
+if (string.IsNullOrWhiteSpace(product))
+    throw new ArgumentException("Product cannot be null or empty.");
+if (quantity <= 0)
+    throw new ArgumentException("Quantity must be positive.");
+if (price <= 0)
+    throw new ArgumentException("Price must be positive.");
+```
+
+These rules would be true in *any* system - you can't have negative quantities or empty product names.
+
+## What Business Rules Might Look Like
+
+Business rules for OrderItem might include:
+
+```csharp
+public record OrderItem
+{
+    // ... existing validation ...
+    
+    public OrderItem(string product, int quantity, decimal price, 
+                    IBusinessRules businessRules) // Inject business context
+    {
+        // Validation first
+        if (quantity <= 0) throw new ArgumentException("Quantity must be positive.");
+        
+        // Then business rules
+        if (quantity > businessRules.MaxQuantityPerItem)
+            throw new DomainException($"Cannot order more than {businessRules.MaxQuantityPerItem} of any single item");
+            
+        if (price < businessRules.MinimumItemPrice)
+            throw new DomainException($"Item price cannot be below minimum of {businessRules.MinimumItemPrice}");
+            
+        if (businessRules.IsRestrictedProduct(product))
+            throw new DomainException($"Product '{product}' is restricted and cannot be ordered");
+    }
+}
+```
+
+## Key Differences
+
+| Validation | Business Rules |
+|------------|----------------|
+| Technical constraints | Domain knowledge |
+| Always true | Context-dependent |
+| Prevents corruption | Enforces business logic |
+| `ArgumentException` | `DomainException` |
+| "Data must be valid" | "Business allows this" |
+
+## In Your Current Code
+
+Your aggregate has good examples of business rules:
+
+```csharp
+// This is a BUSINESS RULE - specific to your domain
+if (outstandingOrders >= _businessRules.MaxOutstandingOrders)
+{
+    throw new InvalidOperationException(
+        $"Customer has reached the maximum of {_businessRules.MaxOutstandingOrders} outstanding orders.");
+}
+```
+
+This isn't about data validity - it's about business policy. A different business might allow unlimited orders.
+
+## DDD Guidance
+
+- **Value Objects** (like OrderItem) should focus on validation and invariants
+- **Entities and Aggregates** should enforce business rules
+- **Domain Services** handle complex business rules that span multiple objects
+- **Business Rules** should be explicit, testable, and changeable
+
+Your current design is actually quite good - you're keeping the validation in the value object and the business rules in the aggregate where they belong!
