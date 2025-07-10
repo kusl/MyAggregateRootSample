@@ -1,4 +1,8 @@
 // MyClassLibrary.cs - All library code in one file
+using System.Reflection;
+using System.Text.Json;
+using Npgsql;
+using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -601,3 +605,524 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+
+// Add these sections to your MyClassLibrary.cs file
+
+// ========== POSTGRESQL MODELS (Add after ENTITIES section) ==========
+
+public class CustomerEntity
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? DefaultShippingAddressJson { get; set; }
+    public string? DefaultBillingAddressJson { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class OrderEntity
+{
+    public Guid Id { get; set; }
+    public Guid CustomerId { get; set; }
+    public DateTime OrderDate { get; set; }
+    public string ShippingAddressJson { get; set; } = string.Empty;
+    public string BillingAddressJson { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class OrderItemEntity
+{
+    public Guid Id { get; set; }
+    public Guid OrderId { get; set; }
+    public string Product { get; set; } = string.Empty;
+    public int Quantity { get; set; }
+    public decimal Price { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class DomainEventEntity
+{
+    public Guid Id { get; set; }
+    public Guid AggregateId { get; set; }
+    public string EventType { get; set; } = string.Empty;
+    public string EventData { get; set; } = string.Empty;
+    public DateTime OccurredOn { get; set; }
+    public bool Processed { get; set; }
+}
+
+// ========== POSTGRESQL REPOSITORY (Add after INFRASTRUCTURE section) ==========
+
+public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepository
+{
+    private readonly string _connectionString;
+    private readonly ILogger<PostgreSqlCustomerAggregateRepository> _logger;
+
+    public PostgreSqlCustomerAggregateRepository(string connectionString, ILogger<PostgreSqlCustomerAggregateRepository> logger)
+    {
+        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving customer aggregate with ID {CustomerId}", id);
+
+        using NpgsqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            // Get customer
+            const string customerSql = @"
+                SELECT id, name, default_shipping_address_json, default_billing_address_json, created_at, updated_at
+                FROM customers 
+                WHERE id = @CustomerId";
+
+            CustomerEntity? customerEntity = await connection.QueryFirstOrDefaultAsync<CustomerEntity>(
+                customerSql, new { CustomerId = id }, transaction);
+
+            if (customerEntity == null)
+            {
+                _logger.LogWarning("Customer aggregate with ID {CustomerId} not found", id);
+                return null;
+            }
+
+            // Get orders
+            const string ordersSql = @"
+                SELECT id, customer_id, order_date, shipping_address_json, billing_address_json, created_at, updated_at
+                FROM orders 
+                WHERE customer_id = @CustomerId
+                ORDER BY order_date";
+
+            IEnumerable<OrderEntity> orderEntities = await connection.QueryAsync<OrderEntity>(
+                ordersSql, new { CustomerId = id }, transaction);
+
+            // Get order items
+            const string orderItemsSql = @"
+                SELECT oi.id, oi.order_id, oi.product, oi.quantity, oi.price, oi.created_at
+                FROM order_items oi
+                INNER JOIN orders o ON oi.order_id = o.id
+                WHERE o.customer_id = @CustomerId
+                ORDER BY oi.created_at";
+
+            IEnumerable<OrderItemEntity> orderItemEntities = await connection.QueryAsync<OrderItemEntity>(
+                orderItemsSql, new { CustomerId = id }, transaction);
+
+            await transaction.CommitAsync(cancellationToken);
+
+            // Reconstruct aggregate
+            CustomerAggregateRoot customer = ReconstructCustomerAggregate(customerEntity, orderEntities, orderItemEntities);
+
+            _logger.LogDebug("Found customer aggregate {CustomerName} with ID {CustomerId}", customer.Name, id);
+            return customer;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            _logger.LogError(ex, "Error retrieving customer aggregate with ID {CustomerId}", id);
+            throw;
+        }
+    }
+
+    public async Task SaveAsync(CustomerAggregateRoot customer, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(customer);
+
+        using NpgsqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            bool isUpdate = await CustomerExistsAsync(customer.Id, connection, transaction, cancellationToken);
+
+            await SaveCustomerEntityAsync(customer, connection, transaction, cancellationToken);
+            await SaveOrdersAsync(customer, connection, transaction, cancellationToken);
+            await SaveDomainEventsAsync(customer, connection, transaction, cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+
+            string action = isUpdate ? "Updated" : "Created";
+            _logger.LogInformation("{Action} customer aggregate {CustomerName} with ID {CustomerId}",
+                action, customer.Name, customer.Id);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            _logger.LogError(ex, "Error saving customer aggregate {CustomerName} with ID {CustomerId}",
+                customer.Name, customer.Id);
+            throw;
+        }
+    }
+
+    private async Task<bool> CustomerExistsAsync(Guid customerId, NpgsqlConnection connection,
+        NpgsqlTransaction transaction, CancellationToken cancellationToken)
+    {
+        const string sql = "SELECT COUNT(1) FROM customers WHERE id = @CustomerId";
+        int count = await connection.ExecuteScalarAsync<int>(sql, new { CustomerId = customerId }, transaction);
+        return count > 0;
+    }
+
+    private async Task SaveCustomerEntityAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
+        NpgsqlTransaction transaction, CancellationToken cancellationToken)
+    {
+        const string sql = @"
+            INSERT INTO customers (id, name, default_shipping_address_json, default_billing_address_json, created_at, updated_at)
+            VALUES (@Id, @Name, @DefaultShippingAddressJson, @DefaultBillingAddressJson, @CreatedAt, @UpdatedAt)
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                default_shipping_address_json = EXCLUDED.default_shipping_address_json,
+                default_billing_address_json = EXCLUDED.default_billing_address_json,
+                updated_at = EXCLUDED.updated_at";
+
+        await connection.ExecuteAsync(sql, new
+        {
+            Id = customer.Id,
+            Name = customer.Name,
+            DefaultShippingAddressJson = customer.DefaultShippingAddress != null ?
+                JsonSerializer.Serialize(customer.DefaultShippingAddress) : null,
+            DefaultBillingAddressJson = customer.DefaultBillingAddress != null ?
+                JsonSerializer.Serialize(customer.DefaultBillingAddress) : null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        }, transaction);
+    }
+
+    private async Task SaveOrdersAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
+        NpgsqlTransaction transaction, CancellationToken cancellationToken)
+    {
+        // Get existing order IDs
+        const string existingOrdersSql = "SELECT id FROM orders WHERE customer_id = @CustomerId";
+        IEnumerable<Guid> existingOrderIds = await connection.QueryAsync<Guid>(
+            existingOrdersSql, new { CustomerId = customer.Id }, transaction);
+        HashSet<Guid> existingOrderSet = [.. existingOrderIds];
+
+        foreach (Order order in customer.Orders)
+        {
+            bool isNewOrder = !existingOrderSet.Contains(order.Id);
+
+            if (isNewOrder)
+            {
+                // Insert new order
+                const string orderSql = @"
+                    INSERT INTO orders (id, customer_id, order_date, shipping_address_json, billing_address_json, created_at, updated_at)
+                    VALUES (@Id, @CustomerId, @OrderDate, @ShippingAddressJson, @BillingAddressJson, @CreatedAt, @UpdatedAt)";
+
+                await connection.ExecuteAsync(orderSql, new
+                {
+                    Id = order.Id,
+                    CustomerId = customer.Id,
+                    OrderDate = order.OrderDate,
+                    ShippingAddressJson = JsonSerializer.Serialize(order.ShippingAddress),
+                    BillingAddressJson = JsonSerializer.Serialize(order.BillingAddress),
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }, transaction);
+            }
+
+            // Handle order items - delete existing and re-insert (simple approach)
+            const string deleteItemsSql = "DELETE FROM order_items WHERE order_id = @OrderId";
+            await connection.ExecuteAsync(deleteItemsSql, new { OrderId = order.Id }, transaction);
+
+            foreach (OrderItem item in order.Items)
+            {
+                const string itemSql = @"
+                    INSERT INTO order_items (id, order_id, product, quantity, price, created_at)
+                    VALUES (@Id, @OrderId, @Product, @Quantity, @Price, @CreatedAt)";
+
+                await connection.ExecuteAsync(itemSql, new
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    Product = item.Product,
+                    Quantity = item.Quantity,
+                    Price = item.Price,
+                    CreatedAt = DateTime.UtcNow
+                }, transaction);
+            }
+        }
+    }
+
+    private async Task SaveDomainEventsAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
+        NpgsqlTransaction transaction, CancellationToken cancellationToken)
+    {
+        foreach (DomainEvent domainEvent in customer.DomainEvents)
+        {
+            const string sql = @"
+                INSERT INTO domain_events (id, aggregate_id, event_type, event_data, occurred_on, processed)
+                VALUES (@Id, @AggregateId, @EventType, @EventData, @OccurredOn, @Processed)
+                ON CONFLICT (id) DO NOTHING";
+
+            await connection.ExecuteAsync(sql, new
+            {
+                Id = domainEvent.Id,
+                AggregateId = customer.Id,
+                EventType = domainEvent.GetType().Name,
+                EventData = JsonSerializer.Serialize(domainEvent),
+                OccurredOn = domainEvent.OccurredOn,
+                Processed = false
+            }, transaction);
+        }
+    }
+
+    private CustomerAggregateRoot ReconstructCustomerAggregate(CustomerEntity customerEntity,
+        IEnumerable<OrderEntity> orderEntities, IEnumerable<OrderItemEntity> orderItemEntities)
+    {
+        // Create customer using reflection to bypass constructor validation
+        CustomerAggregateRoot customer = CreateCustomerWithReflection(customerEntity);
+
+        // Group order items by order
+        Dictionary<Guid, List<OrderItemEntity>> orderItemsGrouped = orderItemEntities
+            .GroupBy(oi => oi.OrderId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Reconstruct orders
+        foreach (OrderEntity orderEntity in orderEntities)
+        {
+            Address shippingAddress = JsonSerializer.Deserialize<Address>(orderEntity.ShippingAddressJson)!;
+            Address billingAddress = JsonSerializer.Deserialize<Address>(orderEntity.BillingAddressJson)!;
+
+            Order order = new(orderEntity.Id, orderEntity.OrderDate, shippingAddress, billingAddress);
+
+            // Add items to order
+            if (orderItemsGrouped.TryGetValue(order.Id, out List<OrderItemEntity>? items))
+            {
+                foreach (OrderItemEntity itemEntity in items)
+                {
+                    OrderItem orderItem = new(itemEntity.Product, itemEntity.Quantity, itemEntity.Price);
+                    order.AddItem(orderItem);
+                }
+            }
+
+            // Add order to customer using reflection
+            AddOrderToCustomerWithReflection(customer, order);
+        }
+
+        return customer;
+    }
+
+    private CustomerAggregateRoot CreateCustomerWithReflection(CustomerEntity customerEntity)
+    {
+        // Create empty customer using private constructor
+        CustomerAggregateRoot customer = (CustomerAggregateRoot)Activator.CreateInstance(
+            typeof(CustomerAggregateRoot), true)!;
+
+        // Set properties using reflection
+        SetPrivateProperty(customer, "Id", customerEntity.Id);
+        SetPrivateProperty(customer, "Name", customerEntity.Name);
+
+        if (!string.IsNullOrEmpty(customerEntity.DefaultShippingAddressJson))
+        {
+            Address shippingAddress = JsonSerializer.Deserialize<Address>(customerEntity.DefaultShippingAddressJson)!;
+            SetPrivateProperty(customer, "DefaultShippingAddress", shippingAddress);
+        }
+
+        if (!string.IsNullOrEmpty(customerEntity.DefaultBillingAddressJson))
+        {
+            Address billingAddress = JsonSerializer.Deserialize<Address>(customerEntity.DefaultBillingAddressJson)!;
+            SetPrivateProperty(customer, "DefaultBillingAddress", billingAddress);
+        }
+
+        return customer;
+    }
+
+    private void AddOrderToCustomerWithReflection(CustomerAggregateRoot customer, Order order)
+    {
+        FieldInfo? ordersField = typeof(CustomerAggregateRoot).GetField("_orders",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        if (ordersField?.GetValue(customer) is List<Order> orders)
+        {
+            orders.Add(order);
+        }
+    }
+
+    private void SetPrivateProperty(object obj, string propertyName, object value)
+    {
+        PropertyInfo? property = obj.GetType().GetProperty(propertyName,
+            BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+
+        if (property != null && property.CanWrite)
+        {
+            property.SetValue(obj, value);
+        }
+        else
+        {
+            // Try to set backing field if property is read-only
+            FieldInfo? field = obj.GetType().GetField($"<{propertyName}>k__BackingField",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            field?.SetValue(obj, value);
+        }
+    }
+}
+
+// ========== POSTGRESQL OUTBOX PATTERN (Add after PostgreSQL Repository) ==========
+
+public class PostgreSqlOutboxDomainEventDispatcher : IDomainEventDispatcher
+{
+    private readonly string _connectionString;
+    private readonly ILogger<PostgreSqlOutboxDomainEventDispatcher> _logger;
+
+    public PostgreSqlOutboxDomainEventDispatcher(string connectionString, ILogger<PostgreSqlOutboxDomainEventDispatcher> logger)
+    {
+        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task DispatchAsync(IEnumerable<DomainEvent> events, CancellationToken cancellationToken = default)
+    {
+        // In outbox pattern, events are already saved by the repository
+        // This method could be used to mark events as processed or publish them
+        foreach (DomainEvent domainEvent in events)
+        {
+            _logger.LogInformation("Domain event queued for processing: {EventType} - {EventId} at {OccurredOn}",
+                domainEvent.GetType().Name, domainEvent.Id, domainEvent.OccurredOn);
+        }
+    }
+
+    public async Task ProcessOutboxEventsAsync(CancellationToken cancellationToken = default)
+    {
+        using NpgsqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        const string sql = @"
+            SELECT id, aggregate_id, event_type, event_data, occurred_on
+            FROM domain_events 
+            WHERE processed = false
+            ORDER BY occurred_on
+            LIMIT 100";
+
+        IEnumerable<DomainEventEntity> eventEntities = await connection.QueryAsync<DomainEventEntity>(sql);
+
+        foreach (DomainEventEntity eventEntity in eventEntities)
+        {
+            try
+            {
+                // Here you would publish to message bus, call webhook, etc.
+                _logger.LogInformation("Processing domain event: {EventType} - {EventId}",
+                    eventEntity.EventType, eventEntity.Id);
+
+                // Mark as processed
+                const string updateSql = "UPDATE domain_events SET processed = true WHERE id = @Id";
+                await connection.ExecuteAsync(updateSql, new { Id = eventEntity.Id });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process domain event {EventId}", eventEntity.Id);
+            }
+        }
+    }
+}
+
+// ========== POSTGRESQL EXTENSIONS (Add to ServiceCollectionExtensions) ==========
+
+public static class PostgreSqlServiceCollectionExtensions
+{
+    public static IServiceCollection AddCustomerDomainWithPostgreSql(this IServiceCollection services,
+        IConfiguration configuration, string connectionString)
+    {
+        // Configure business rules
+        _ = services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
+        _ = services.AddSingleton(provider =>
+        {
+            IOptions<CustomerBusinessRules> options = provider.GetRequiredService<IOptions<CustomerBusinessRules>>();
+            return options.Value;
+        });
+
+        // Register PostgreSQL repositories
+        _ = services.AddSingleton<ICustomerAggregateRepository>(provider =>
+        {
+            ILogger<PostgreSqlCustomerAggregateRepository> logger =
+                provider.GetRequiredService<ILogger<PostgreSqlCustomerAggregateRepository>>();
+            return new PostgreSqlCustomerAggregateRepository(connectionString, logger);
+        });
+
+        // Register PostgreSQL domain event dispatcher
+        _ = services.AddSingleton<IDomainEventDispatcher>(provider =>
+        {
+            ILogger<PostgreSqlOutboxDomainEventDispatcher> logger =
+                provider.GetRequiredService<ILogger<PostgreSqlOutboxDomainEventDispatcher>>();
+            return new PostgreSqlOutboxDomainEventDispatcher(connectionString, logger);
+        });
+
+        // Register application services
+        _ = services.AddTransient<CustomerApplicationService>();
+
+        return services;
+    }
+}
+
+// ========== DATABASE SCHEMA (Add as constants) ==========
+
+public static class PostgreSqlSchema
+{
+    public const string CreateTablesScript = @"
+        -- Create customers table
+        CREATE TABLE IF NOT EXISTS customers (
+            id UUID PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            default_shipping_address_json JSONB,
+            default_billing_address_json JSONB,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+        );
+
+        -- Create orders table
+        CREATE TABLE IF NOT EXISTS orders (
+            id UUID PRIMARY KEY,
+            customer_id UUID NOT NULL REFERENCES customers(id),
+            order_date TIMESTAMP WITH TIME ZONE NOT NULL,
+            shipping_address_json JSONB NOT NULL,
+            billing_address_json JSONB NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+        );
+
+        -- Create order_items table
+        CREATE TABLE IF NOT EXISTS order_items (
+            id UUID PRIMARY KEY,
+            order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            product VARCHAR(255) NOT NULL,
+            quantity INTEGER NOT NULL CHECK (quantity > 0),
+            price DECIMAL(10,2) NOT NULL CHECK (price > 0),
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL
+        );
+
+        -- Create domain_events table (outbox pattern)
+        CREATE TABLE IF NOT EXISTS domain_events (
+            id UUID PRIMARY KEY,
+            aggregate_id UUID NOT NULL,
+            event_type VARCHAR(255) NOT NULL,
+            event_data JSONB NOT NULL,
+            occurred_on TIMESTAMP WITH TIME ZONE NOT NULL,
+            processed BOOLEAN NOT NULL DEFAULT FALSE
+        );
+
+        -- Create indexes
+        CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_orders_order_date ON orders(order_date);
+        CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+        CREATE INDEX IF NOT EXISTS idx_domain_events_processed ON domain_events(processed);
+        CREATE INDEX IF NOT EXISTS idx_domain_events_occurred_on ON domain_events(occurred_on);
+        CREATE INDEX IF NOT EXISTS idx_domain_events_aggregate_id ON domain_events(aggregate_id);
+    ";
+
+    public static async Task InitializeDatabaseAsync(string connectionString)
+    {
+        using NpgsqlConnection connection = new(connectionString);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(CreateTablesScript);
+    }
+}
+
+// ========== ADDITIONAL USING STATEMENTS (Add to top of file) ==========
+/*
+You'll need to add these using statements at the top of your file:
+
+using System.Reflection;
+using System.Text.Json;
+using Npgsql;
+using Dapper;
+*/
