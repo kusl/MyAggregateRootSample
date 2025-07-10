@@ -19,15 +19,29 @@ public record Address
     public Address(string street, string city, string state, string postalCode, string country)
     {
         if (string.IsNullOrWhiteSpace(street))
+        {
             throw new ArgumentException("Street cannot be null or empty.", nameof(street));
+        }
+
         if (string.IsNullOrWhiteSpace(city))
+        {
             throw new ArgumentException("City cannot be null or empty.", nameof(city));
+        }
+
         if (string.IsNullOrWhiteSpace(state))
+        {
             throw new ArgumentException("State cannot be null or empty.", nameof(state));
+        }
+
         if (string.IsNullOrWhiteSpace(postalCode))
+        {
             throw new ArgumentException("Postal code cannot be null or empty.", nameof(postalCode));
+        }
+
         if (string.IsNullOrWhiteSpace(country))
+        {
             throw new ArgumentException("Country cannot be null or empty.", nameof(country));
+        }
 
         Street = street.Trim();
         City = city.Trim();
@@ -36,7 +50,10 @@ public record Address
         Country = country.Trim();
     }
 
-    public override string ToString() => $"{Street}, {City}, {State} {PostalCode}, {Country}";
+    public override string ToString()
+    {
+        return $"{Street}, {City}, {State} {PostalCode}, {Country}";
+    }
 }
 
 public record OrderItem
@@ -49,11 +66,19 @@ public record OrderItem
     public OrderItem(string product, int quantity, decimal price)
     {
         if (string.IsNullOrWhiteSpace(product))
+        {
             throw new ArgumentException("Product cannot be null or empty.", nameof(product));
+        }
+
         if (quantity <= 0)
+        {
             throw new ArgumentException("Quantity must be positive.", nameof(quantity));
+        }
+
         if (price <= 0)
+        {
             throw new ArgumentException("Price must be positive.", nameof(price));
+        }
 
         Product = product.Trim();
         Quantity = quantity;
@@ -106,9 +131,14 @@ public class Order
     public Order(Guid id, DateTime orderDate, Address shippingAddress, Address billingAddress)
     {
         if (id == Guid.Empty)
+        {
             throw new ArgumentException("Order ID cannot be empty.", nameof(id));
+        }
+
         if (orderDate > DateTime.UtcNow)
+        {
             throw new ArgumentException("Order date cannot be in the future.", nameof(orderDate));
+        }
 
         Id = id;
         OrderDate = orderDate;
@@ -124,7 +154,7 @@ public class Order
         OrderItem? existingItem = _items.FirstOrDefault(i => i.Product == item.Product && i.Price == item.Price);
         if (existingItem != null)
         {
-            _items.Remove(existingItem);
+            _ = _items.Remove(existingItem);
             _items.Add(new OrderItem(item.Product, existingItem.Quantity + item.Quantity, item.Price));
         }
         else
@@ -135,8 +165,10 @@ public class Order
 
     public decimal TotalAmount => _items.Sum(item => item.LineTotal);
 
-    public bool IsOutstanding(int outstandingDays) =>
-        OrderDate.AddDays(outstandingDays) > DateTime.UtcNow;
+    public bool IsOutstanding(int outstandingDays)
+    {
+        return OrderDate.AddDays(outstandingDays) > DateTime.UtcNow;
+    }
 }
 
 // ========== AGGREGATES ==========
@@ -165,9 +197,14 @@ public class CustomerAggregateRoot
     public CustomerAggregateRoot(Guid id, string name, CustomerBusinessRules businessRules, ILogger<CustomerAggregateRoot>? logger = null)
     {
         if (id == Guid.Empty)
+        {
             throw new ArgumentException("Customer ID cannot be empty.", nameof(id));
+        }
+
         if (string.IsNullOrWhiteSpace(name))
+        {
             throw new ArgumentException("Customer name cannot be null or empty.", nameof(name));
+        }
 
         Id = id;
         Name = name.Trim();
@@ -217,9 +254,14 @@ public class CustomerAggregateRoot
         Address? orderBillingAddress = billingAddress ?? DefaultBillingAddress;
 
         if (orderShippingAddress == null)
+        {
             throw new InvalidOperationException("Shipping address is required to place an order.");
+        }
+
         if (orderBillingAddress == null)
+        {
             throw new InvalidOperationException("Billing address is required to place an order.");
+        }
 
         int outstandingOrders = _orders.Count(o => o.IsOutstanding(_businessRules.OutstandingOrderDays));
 
@@ -481,7 +523,7 @@ public class LoggingDomainEventDispatcher(ILogger<LoggingDomainEventDispatcher> 
 public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggregateRepository> logger) : ICustomerAggregateRepository
 {
     private static readonly Dictionary<Guid, CustomerAggregateRoot> _customers = [];
-    private static readonly object _lock = new(); // Add lock for thread safety
+    private static readonly Lock _lock = new(); // Add lock for thread safety
     private readonly ILogger<InMemoryCustomerAggregateRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -491,7 +533,7 @@ public class InMemoryCustomerAggregateRepository(ILogger<InMemoryCustomerAggrega
         CustomerAggregateRoot? customer;
         lock (_lock)
         {
-            _customers.TryGetValue(id, out customer);
+            _ = _customers.TryGetValue(id, out customer);
         }
 
         if (customer == null)
@@ -540,21 +582,21 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddCustomerDomain(this IServiceCollection services, IConfiguration configuration)
     {
         // Configure business rules
-        services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
-        services.AddSingleton(provider =>
+        _ = services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
+        _ = services.AddSingleton(provider =>
         {
             IOptions<CustomerBusinessRules> options = provider.GetRequiredService<IOptions<CustomerBusinessRules>>();
             return options.Value;
         });
 
         // Register repositories
-        services.AddSingleton<ICustomerAggregateRepository, InMemoryCustomerAggregateRepository>();
+        _ = services.AddSingleton<ICustomerAggregateRepository, InMemoryCustomerAggregateRepository>();
 
         // Register domain event dispatcher
-        services.AddSingleton<IDomainEventDispatcher, LoggingDomainEventDispatcher>();
+        _ = services.AddSingleton<IDomainEventDispatcher, LoggingDomainEventDispatcher>();
 
         // Register application services
-        services.AddTransient<CustomerApplicationService>();
+        _ = services.AddTransient<CustomerApplicationService>();
 
         return services;
     }
