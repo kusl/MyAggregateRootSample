@@ -653,16 +653,10 @@ public class DomainEventEntity
 
 // ========== POSTGRESQL REPOSITORY (Add after INFRASTRUCTURE section) ==========
 
-public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepository
+public class PostgreSqlCustomerAggregateRepository(string connectionString, ILogger<PostgreSqlCustomerAggregateRepository> logger) : ICustomerAggregateRepository
 {
-    private readonly string _connectionString;
-    private readonly ILogger<PostgreSqlCustomerAggregateRepository> _logger;
-
-    public PostgreSqlCustomerAggregateRepository(string connectionString, ILogger<PostgreSqlCustomerAggregateRepository> logger)
-    {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly string _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+    private readonly ILogger<PostgreSqlCustomerAggregateRepository> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<CustomerAggregateRoot?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -757,15 +751,17 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
         }
     }
 
-    private async Task<bool> CustomerExistsAsync(Guid customerId, NpgsqlConnection connection,
+    private static async Task<bool> CustomerExistsAsync(Guid customerId, NpgsqlConnection connection,
         NpgsqlTransaction transaction, CancellationToken cancellationToken)
     {
         const string sql = "SELECT COUNT(1) FROM customers WHERE id = @CustomerId";
-        int count = await connection.ExecuteScalarAsync<int>(sql, new { CustomerId = customerId }, transaction);
+
+        var command = new CommandDefinition(sql, new { CustomerId = customerId }, transaction, cancellationToken: cancellationToken);
+        int count = await connection.ExecuteScalarAsync<int>(command);
         return count > 0;
     }
 
-    private async Task SaveCustomerEntityAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
+    private static async Task SaveCustomerEntityAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
         NpgsqlTransaction transaction, CancellationToken cancellationToken)
     {
         const string sql = @"
@@ -777,26 +773,29 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
                 default_billing_address_json = EXCLUDED.default_billing_address_json,
                 updated_at = EXCLUDED.updated_at";
 
-        await connection.ExecuteAsync(sql, new
+        var command = new CommandDefinition(sql, new
         {
-            Id = customer.Id,
-            Name = customer.Name,
+            customer.Id,
+            customer.Name,
             DefaultShippingAddressJson = customer.DefaultShippingAddress != null ?
                 JsonSerializer.Serialize(customer.DefaultShippingAddress) : null,
             DefaultBillingAddressJson = customer.DefaultBillingAddress != null ?
                 JsonSerializer.Serialize(customer.DefaultBillingAddress) : null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
-        }, transaction);
+        }, transaction, cancellationToken: cancellationToken);
+
+        await connection.ExecuteAsync(command);
     }
 
-    private async Task SaveOrdersAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
+    private static async Task SaveOrdersAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
         NpgsqlTransaction transaction, CancellationToken cancellationToken)
     {
         // Get existing order IDs
         const string existingOrdersSql = "SELECT id FROM orders WHERE customer_id = @CustomerId";
-        IEnumerable<Guid> existingOrderIds = await connection.QueryAsync<Guid>(
-            existingOrdersSql, new { CustomerId = customer.Id }, transaction);
+
+        var existingOrdersCommand = new CommandDefinition(existingOrdersSql, new { CustomerId = customer.Id }, transaction, cancellationToken: cancellationToken);
+        IEnumerable<Guid> existingOrderIds = await connection.QueryAsync<Guid>(existingOrdersCommand);
         HashSet<Guid> existingOrderSet = [.. existingOrderIds];
 
         foreach (Order order in customer.Orders)
@@ -810,21 +809,24 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
                     INSERT INTO orders (id, customer_id, order_date, shipping_address_json, billing_address_json, created_at, updated_at)
                     VALUES (@Id, @CustomerId, @OrderDate, @ShippingAddressJson, @BillingAddressJson, @CreatedAt, @UpdatedAt)";
 
-                await connection.ExecuteAsync(orderSql, new
+                var orderCommand = new CommandDefinition(orderSql, new
                 {
-                    Id = order.Id,
+                    order.Id,
                     CustomerId = customer.Id,
-                    OrderDate = order.OrderDate,
+                    order.OrderDate,
                     ShippingAddressJson = JsonSerializer.Serialize(order.ShippingAddress),
                     BillingAddressJson = JsonSerializer.Serialize(order.BillingAddress),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
-                }, transaction);
+                }, transaction, cancellationToken: cancellationToken);
+
+                await connection.ExecuteAsync(orderCommand);
             }
 
             // Handle order items - delete existing and re-insert (simple approach)
             const string deleteItemsSql = "DELETE FROM order_items WHERE order_id = @OrderId";
-            await connection.ExecuteAsync(deleteItemsSql, new { OrderId = order.Id }, transaction);
+            var deleteCommand = new CommandDefinition(deleteItemsSql, new { OrderId = order.Id }, transaction, cancellationToken: cancellationToken);
+            await connection.ExecuteAsync(deleteCommand);
 
             foreach (OrderItem item in order.Items)
             {
@@ -832,20 +834,22 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
                     INSERT INTO order_items (id, order_id, product, quantity, price, created_at)
                     VALUES (@Id, @OrderId, @Product, @Quantity, @Price, @CreatedAt)";
 
-                await connection.ExecuteAsync(itemSql, new
+                var itemCommand = new CommandDefinition(itemSql, new
                 {
                     Id = Guid.NewGuid(),
                     OrderId = order.Id,
-                    Product = item.Product,
-                    Quantity = item.Quantity,
-                    Price = item.Price,
+                    item.Product,
+                    item.Quantity,
+                    item.Price,
                     CreatedAt = DateTime.UtcNow
-                }, transaction);
+                }, transaction, cancellationToken: cancellationToken);
+
+                await connection.ExecuteAsync(itemCommand);
             }
         }
     }
 
-    private async Task SaveDomainEventsAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
+    private static async Task SaveDomainEventsAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
         NpgsqlTransaction transaction, CancellationToken cancellationToken)
     {
         foreach (DomainEvent domainEvent in customer.DomainEvents)
@@ -855,19 +859,21 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
                 VALUES (@Id, @AggregateId, @EventType, @EventData, @OccurredOn, @Processed)
                 ON CONFLICT (id) DO NOTHING";
 
-            await connection.ExecuteAsync(sql, new
+            var command = new CommandDefinition(sql, new
             {
-                Id = domainEvent.Id,
+                domainEvent.Id,
                 AggregateId = customer.Id,
                 EventType = domainEvent.GetType().Name,
                 EventData = JsonSerializer.Serialize(domainEvent),
-                OccurredOn = domainEvent.OccurredOn,
+                domainEvent.OccurredOn,
                 Processed = false
-            }, transaction);
+            }, transaction, cancellationToken: cancellationToken);
+
+            await connection.ExecuteAsync(command);
         }
     }
 
-    private CustomerAggregateRoot ReconstructCustomerAggregate(CustomerEntity customerEntity,
+    private static CustomerAggregateRoot ReconstructCustomerAggregate(CustomerEntity customerEntity,
         IEnumerable<OrderEntity> orderEntities, IEnumerable<OrderItemEntity> orderItemEntities)
     {
         // Create customer using reflection to bypass constructor validation
@@ -903,32 +909,32 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
         return customer;
     }
 
-    private CustomerAggregateRoot CreateCustomerWithReflection(CustomerEntity customerEntity)
+    private static CustomerAggregateRoot CreateCustomerWithReflection(CustomerEntity customerEntity)
     {
         // Create empty customer using private constructor
         CustomerAggregateRoot customer = (CustomerAggregateRoot)Activator.CreateInstance(
             typeof(CustomerAggregateRoot), true)!;
 
         // Set properties using reflection
-        SetPrivateProperty(customer, "Id", customerEntity.Id);
-        SetPrivateProperty(customer, "Name", customerEntity.Name);
+        SetPrivateProperty(customer, nameof(CustomerAggregateRoot.Id), customerEntity.Id);
+        SetPrivateProperty(customer, nameof(CustomerAggregateRoot.Name), customerEntity.Name);
 
         if (!string.IsNullOrEmpty(customerEntity.DefaultShippingAddressJson))
         {
             Address shippingAddress = JsonSerializer.Deserialize<Address>(customerEntity.DefaultShippingAddressJson)!;
-            SetPrivateProperty(customer, "DefaultShippingAddress", shippingAddress);
+            SetPrivateProperty(customer, nameof(CustomerAggregateRoot.DefaultShippingAddress), shippingAddress);
         }
 
         if (!string.IsNullOrEmpty(customerEntity.DefaultBillingAddressJson))
         {
             Address billingAddress = JsonSerializer.Deserialize<Address>(customerEntity.DefaultBillingAddressJson)!;
-            SetPrivateProperty(customer, "DefaultBillingAddress", billingAddress);
+            SetPrivateProperty(customer, nameof(CustomerAggregateRoot.DefaultBillingAddress), billingAddress);
         }
 
         return customer;
     }
 
-    private void AddOrderToCustomerWithReflection(CustomerAggregateRoot customer, Order order)
+    private static void AddOrderToCustomerWithReflection(CustomerAggregateRoot customer, Order order)
     {
         FieldInfo? ordersField = typeof(CustomerAggregateRoot).GetField("_orders",
             BindingFlags.NonPublic | BindingFlags.Instance);
@@ -939,7 +945,7 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
         }
     }
 
-    private void SetPrivateProperty(object obj, string propertyName, object value)
+    private static void SetPrivateProperty(object obj, string propertyName, object value)
     {
         PropertyInfo? property = obj.GetType().GetProperty(propertyName,
             BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -960,18 +966,12 @@ public class PostgreSqlCustomerAggregateRepository : ICustomerAggregateRepositor
 
 // ========== POSTGRESQL OUTBOX PATTERN (Add after PostgreSQL Repository) ==========
 
-public class PostgreSqlOutboxDomainEventDispatcher : IDomainEventDispatcher
+public class PostgreSqlOutboxDomainEventDispatcher(string connectionString, ILogger<PostgreSqlOutboxDomainEventDispatcher> logger) : IDomainEventDispatcher
 {
-    private readonly string _connectionString;
-    private readonly ILogger<PostgreSqlOutboxDomainEventDispatcher> _logger;
+    private readonly string _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+    private readonly ILogger<PostgreSqlOutboxDomainEventDispatcher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public PostgreSqlOutboxDomainEventDispatcher(string connectionString, ILogger<PostgreSqlOutboxDomainEventDispatcher> logger)
-    {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    public async Task DispatchAsync(IEnumerable<DomainEvent> events, CancellationToken cancellationToken = default)
+    public Task DispatchAsync(IEnumerable<DomainEvent> events, CancellationToken cancellationToken = default)
     {
         // In outbox pattern, events are already saved by the repository
         // This method could be used to mark events as processed or publish them
@@ -980,6 +980,8 @@ public class PostgreSqlOutboxDomainEventDispatcher : IDomainEventDispatcher
             _logger.LogInformation("Domain event queued for processing: {EventType} - {EventId} at {OccurredOn}",
                 domainEvent.GetType().Name, domainEvent.Id, domainEvent.OccurredOn);
         }
+
+        return Task.CompletedTask;
     }
 
     public async Task ProcessOutboxEventsAsync(CancellationToken cancellationToken = default)
@@ -994,7 +996,8 @@ public class PostgreSqlOutboxDomainEventDispatcher : IDomainEventDispatcher
             ORDER BY occurred_on
             LIMIT 100";
 
-        IEnumerable<DomainEventEntity> eventEntities = await connection.QueryAsync<DomainEventEntity>(sql);
+        var command = new CommandDefinition(sql, cancellationToken: cancellationToken);
+        IEnumerable<DomainEventEntity> eventEntities = await connection.QueryAsync<DomainEventEntity>(command);
 
         foreach (DomainEventEntity eventEntity in eventEntities)
         {
@@ -1006,7 +1009,8 @@ public class PostgreSqlOutboxDomainEventDispatcher : IDomainEventDispatcher
 
                 // Mark as processed
                 const string updateSql = "UPDATE domain_events SET processed = true WHERE id = @Id";
-                await connection.ExecuteAsync(updateSql, new { Id = eventEntity.Id });
+                var updateCommand = new CommandDefinition(updateSql, new { eventEntity.Id }, cancellationToken: cancellationToken);
+                await connection.ExecuteAsync(updateCommand);
             }
             catch (Exception ex)
             {
@@ -1024,15 +1028,15 @@ public static class PostgreSqlServiceCollectionExtensions
         IConfiguration configuration, string connectionString)
     {
         // Configure business rules
-        _ = services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
-        _ = services.AddSingleton(provider =>
+        services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
+        services.AddSingleton(provider =>
         {
             IOptions<CustomerBusinessRules> options = provider.GetRequiredService<IOptions<CustomerBusinessRules>>();
             return options.Value;
         });
 
         // Register PostgreSQL repositories
-        _ = services.AddSingleton<ICustomerAggregateRepository>(provider =>
+        services.AddSingleton<ICustomerAggregateRepository>(provider =>
         {
             ILogger<PostgreSqlCustomerAggregateRepository> logger =
                 provider.GetRequiredService<ILogger<PostgreSqlCustomerAggregateRepository>>();
@@ -1040,7 +1044,7 @@ public static class PostgreSqlServiceCollectionExtensions
         });
 
         // Register PostgreSQL domain event dispatcher
-        _ = services.AddSingleton<IDomainEventDispatcher>(provider =>
+        services.AddSingleton<IDomainEventDispatcher>(provider =>
         {
             ILogger<PostgreSqlOutboxDomainEventDispatcher> logger =
                 provider.GetRequiredService<ILogger<PostgreSqlOutboxDomainEventDispatcher>>();
@@ -1048,7 +1052,7 @@ public static class PostgreSqlServiceCollectionExtensions
         });
 
         // Register application services
-        _ = services.AddTransient<CustomerApplicationService>();
+        services.AddTransient<CustomerApplicationService>();
 
         return services;
     }
@@ -1109,11 +1113,13 @@ public static class PostgreSqlSchema
         CREATE INDEX IF NOT EXISTS idx_domain_events_aggregate_id ON domain_events(aggregate_id);
     ";
 
-    public static async Task InitializeDatabaseAsync(string connectionString)
+    public static async Task InitializeDatabaseAsync(string connectionString, CancellationToken cancellationToken = default)
     {
         using NpgsqlConnection connection = new(connectionString);
-        await connection.OpenAsync();
-        await connection.ExecuteAsync(CreateTablesScript);
+        await connection.OpenAsync(cancellationToken);
+
+        var command = new CommandDefinition(CreateTablesScript, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
     }
 }
 
