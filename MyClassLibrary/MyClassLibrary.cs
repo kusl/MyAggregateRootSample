@@ -1,12 +1,12 @@
 // MyClassLibrary.cs - All library code in one file
 using System.Reflection;
 using System.Text.Json;
-using Npgsql;
 using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace MyClassLibrary;
 
@@ -756,7 +756,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
     {
         const string sql = "SELECT COUNT(1) FROM customers WHERE id = @CustomerId";
 
-        var command = new CommandDefinition(sql, new { CustomerId = customerId }, transaction, cancellationToken: cancellationToken);
+        CommandDefinition command = new(sql, new { CustomerId = customerId }, transaction, cancellationToken: cancellationToken);
         int count = await connection.ExecuteScalarAsync<int>(command);
         return count > 0;
     }
@@ -773,7 +773,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                 default_billing_address_json = EXCLUDED.default_billing_address_json,
                 updated_at = EXCLUDED.updated_at";
 
-        var command = new CommandDefinition(sql, new
+        CommandDefinition command = new(sql, new
         {
             customer.Id,
             customer.Name,
@@ -785,7 +785,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
             UpdatedAt = DateTime.UtcNow
         }, transaction, cancellationToken: cancellationToken);
 
-        await connection.ExecuteAsync(command);
+        _ = await connection.ExecuteAsync(command);
     }
 
     private static async Task SaveOrdersAsync(CustomerAggregateRoot customer, NpgsqlConnection connection,
@@ -794,7 +794,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
         // Get existing order IDs
         const string existingOrdersSql = "SELECT id FROM orders WHERE customer_id = @CustomerId";
 
-        var existingOrdersCommand = new CommandDefinition(existingOrdersSql, new { CustomerId = customer.Id }, transaction, cancellationToken: cancellationToken);
+        CommandDefinition existingOrdersCommand = new(existingOrdersSql, new { CustomerId = customer.Id }, transaction, cancellationToken: cancellationToken);
         IEnumerable<Guid> existingOrderIds = await connection.QueryAsync<Guid>(existingOrdersCommand);
         HashSet<Guid> existingOrderSet = [.. existingOrderIds];
 
@@ -809,7 +809,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                     INSERT INTO orders (id, customer_id, order_date, shipping_address_json, billing_address_json, created_at, updated_at)
                     VALUES (@Id, @CustomerId, @OrderDate, @ShippingAddressJson, @BillingAddressJson, @CreatedAt, @UpdatedAt)";
 
-                var orderCommand = new CommandDefinition(orderSql, new
+                CommandDefinition orderCommand = new(orderSql, new
                 {
                     order.Id,
                     CustomerId = customer.Id,
@@ -820,13 +820,13 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                     UpdatedAt = DateTime.UtcNow
                 }, transaction, cancellationToken: cancellationToken);
 
-                await connection.ExecuteAsync(orderCommand);
+                _ = await connection.ExecuteAsync(orderCommand);
             }
 
             // Handle order items - delete existing and re-insert (simple approach)
             const string deleteItemsSql = "DELETE FROM order_items WHERE order_id = @OrderId";
-            var deleteCommand = new CommandDefinition(deleteItemsSql, new { OrderId = order.Id }, transaction, cancellationToken: cancellationToken);
-            await connection.ExecuteAsync(deleteCommand);
+            CommandDefinition deleteCommand = new(deleteItemsSql, new { OrderId = order.Id }, transaction, cancellationToken: cancellationToken);
+            _ = await connection.ExecuteAsync(deleteCommand);
 
             foreach (OrderItem item in order.Items)
             {
@@ -834,7 +834,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                     INSERT INTO order_items (id, order_id, product, quantity, price, created_at)
                     VALUES (@Id, @OrderId, @Product, @Quantity, @Price, @CreatedAt)";
 
-                var itemCommand = new CommandDefinition(itemSql, new
+                CommandDefinition itemCommand = new(itemSql, new
                 {
                     Id = Guid.NewGuid(),
                     OrderId = order.Id,
@@ -844,7 +844,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                     CreatedAt = DateTime.UtcNow
                 }, transaction, cancellationToken: cancellationToken);
 
-                await connection.ExecuteAsync(itemCommand);
+                _ = await connection.ExecuteAsync(itemCommand);
             }
         }
     }
@@ -859,7 +859,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                 VALUES (@Id, @AggregateId, @EventType, @EventData, @OccurredOn, @Processed)
                 ON CONFLICT (id) DO NOTHING";
 
-            var command = new CommandDefinition(sql, new
+            CommandDefinition command = new(sql, new
             {
                 domainEvent.Id,
                 AggregateId = customer.Id,
@@ -869,7 +869,7 @@ public class PostgreSqlCustomerAggregateRepository(string connectionString, ILog
                 Processed = false
             }, transaction, cancellationToken: cancellationToken);
 
-            await connection.ExecuteAsync(command);
+            _ = await connection.ExecuteAsync(command);
         }
     }
 
@@ -996,7 +996,7 @@ public class PostgreSqlOutboxDomainEventDispatcher(string connectionString, ILog
             ORDER BY occurred_on
             LIMIT 100";
 
-        var command = new CommandDefinition(sql, cancellationToken: cancellationToken);
+        CommandDefinition command = new(sql, cancellationToken: cancellationToken);
         IEnumerable<DomainEventEntity> eventEntities = await connection.QueryAsync<DomainEventEntity>(command);
 
         foreach (DomainEventEntity eventEntity in eventEntities)
@@ -1009,8 +1009,8 @@ public class PostgreSqlOutboxDomainEventDispatcher(string connectionString, ILog
 
                 // Mark as processed
                 const string updateSql = "UPDATE domain_events SET processed = true WHERE id = @Id";
-                var updateCommand = new CommandDefinition(updateSql, new { eventEntity.Id }, cancellationToken: cancellationToken);
-                await connection.ExecuteAsync(updateCommand);
+                CommandDefinition updateCommand = new(updateSql, new { eventEntity.Id }, cancellationToken: cancellationToken);
+                _ = await connection.ExecuteAsync(updateCommand);
             }
             catch (Exception ex)
             {
@@ -1028,15 +1028,15 @@ public static class PostgreSqlServiceCollectionExtensions
         IConfiguration configuration, string connectionString)
     {
         // Configure business rules
-        services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
-        services.AddSingleton(provider =>
+        _ = services.Configure<CustomerBusinessRules>(configuration.GetSection("CustomerBusinessRules"));
+        _ = services.AddSingleton(provider =>
         {
             IOptions<CustomerBusinessRules> options = provider.GetRequiredService<IOptions<CustomerBusinessRules>>();
             return options.Value;
         });
 
         // Register PostgreSQL repositories
-        services.AddSingleton<ICustomerAggregateRepository>(provider =>
+        _ = services.AddSingleton<ICustomerAggregateRepository>(provider =>
         {
             ILogger<PostgreSqlCustomerAggregateRepository> logger =
                 provider.GetRequiredService<ILogger<PostgreSqlCustomerAggregateRepository>>();
@@ -1044,7 +1044,7 @@ public static class PostgreSqlServiceCollectionExtensions
         });
 
         // Register PostgreSQL domain event dispatcher
-        services.AddSingleton<IDomainEventDispatcher>(provider =>
+        _ = services.AddSingleton<IDomainEventDispatcher>(provider =>
         {
             ILogger<PostgreSqlOutboxDomainEventDispatcher> logger =
                 provider.GetRequiredService<ILogger<PostgreSqlOutboxDomainEventDispatcher>>();
@@ -1052,7 +1052,7 @@ public static class PostgreSqlServiceCollectionExtensions
         });
 
         // Register application services
-        services.AddTransient<CustomerApplicationService>();
+        _ = services.AddTransient<CustomerApplicationService>();
 
         return services;
     }
@@ -1118,8 +1118,8 @@ public static class PostgreSqlSchema
         using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync(cancellationToken);
 
-        var command = new CommandDefinition(CreateTablesScript, cancellationToken: cancellationToken);
-        await connection.ExecuteAsync(command);
+        CommandDefinition command = new(CreateTablesScript, cancellationToken: cancellationToken);
+        _ = await connection.ExecuteAsync(command);
     }
 }
 
