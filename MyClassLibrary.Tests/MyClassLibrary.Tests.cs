@@ -1,5 +1,6 @@
 // MyClassLibrary.Tests.cs - All test code in one file
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -2004,3 +2005,597 @@ public class ServiceCollectionExtensionsTests
     }
 }
 
+// Add these test sections to your MyClassLibrary.Tests.cs file
+// These tests are completely additive - no existing code needs to change
+
+// ========== POSTGRESQL ENTITY TESTS (Add new section) ==========
+
+public class PostgreSqlEntityTests
+{
+    [Fact]
+    public void CustomerEntity_PropertiesSetCorrectly()
+    {
+        // Arrange
+        var entity = new CustomerEntity
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Customer",
+            DefaultShippingAddressJson = """{"Street":"123 Test St","City":"Test City","State":"TS","PostalCode":"12345","Country":"Test Country"}""",
+            DefaultBillingAddressJson = """{"Street":"456 Bill Ave","City":"Bill City","State":"BC","PostalCode":"54321","Country":"Bill Country"}""",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Act & Assert
+        Assert.NotEqual(Guid.Empty, entity.Id);
+        Assert.Equal("Test Customer", entity.Name);
+        Assert.NotNull(entity.DefaultShippingAddressJson);
+        Assert.NotNull(entity.DefaultBillingAddressJson);
+    }
+
+    [Fact]
+    public void OrderEntity_PropertiesSetCorrectly()
+    {
+        // Arrange
+        var entity = new OrderEntity
+        {
+            Id = Guid.NewGuid(),
+            CustomerId = Guid.NewGuid(),
+            OrderDate = DateTime.UtcNow,
+            ShippingAddressJson = """{"Street":"123 Test St","City":"Test City","State":"TS","PostalCode":"12345","Country":"Test Country"}""",
+            BillingAddressJson = """{"Street":"456 Bill Ave","City":"Bill City","State":"BC","PostalCode":"54321","Country":"Bill Country"}""",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Act & Assert
+        Assert.NotEqual(Guid.Empty, entity.Id);
+        Assert.NotEqual(Guid.Empty, entity.CustomerId);
+        Assert.NotNull(entity.ShippingAddressJson);
+        Assert.NotNull(entity.BillingAddressJson);
+    }
+
+    [Fact]
+    public void OrderItemEntity_PropertiesSetCorrectly()
+    {
+        // Arrange
+        var entity = new OrderItemEntity
+        {
+            Id = Guid.NewGuid(),
+            OrderId = Guid.NewGuid(),
+            Product = "Test Product",
+            Quantity = 5,
+            Price = 19.99m,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Act & Assert
+        Assert.NotEqual(Guid.Empty, entity.Id);
+        Assert.NotEqual(Guid.Empty, entity.OrderId);
+        Assert.Equal("Test Product", entity.Product);
+        Assert.Equal(5, entity.Quantity);
+        Assert.Equal(19.99m, entity.Price);
+    }
+
+    [Fact]
+    public void DomainEventEntity_PropertiesSetCorrectly()
+    {
+        // Arrange
+        var entity = new DomainEventEntity
+        {
+            Id = Guid.NewGuid(),
+            AggregateId = Guid.NewGuid(),
+            EventType = "CustomerCreatedEvent",
+            EventData = """{"Id":"123","CustomerId":"456","CustomerName":"Test"}""",
+            OccurredOn = DateTime.UtcNow,
+            Processed = false
+        };
+
+        // Act & Assert
+        Assert.NotEqual(Guid.Empty, entity.Id);
+        Assert.NotEqual(Guid.Empty, entity.AggregateId);
+        Assert.Equal("CustomerCreatedEvent", entity.EventType);
+        Assert.NotNull(entity.EventData);
+        Assert.False(entity.Processed);
+    }
+}
+
+// ========== POSTGRESQL SCHEMA TESTS (Add new section) ==========
+
+public class PostgreSqlSchemaTests
+{
+    [Fact]
+    public void CreateTablesScript_IsNotNullOrEmpty()
+    {
+        // Act & Assert
+        Assert.NotNull(PostgreSqlSchema.CreateTablesScript);
+        Assert.NotEmpty(PostgreSqlSchema.CreateTablesScript);
+    }
+
+    [Fact]
+    public void CreateTablesScript_ContainsExpectedTables()
+    {
+        // Arrange
+        string script = PostgreSqlSchema.CreateTablesScript;
+
+        // Act & Assert
+        Assert.Contains("CREATE TABLE IF NOT EXISTS customers", script);
+        Assert.Contains("CREATE TABLE IF NOT EXISTS orders", script);
+        Assert.Contains("CREATE TABLE IF NOT EXISTS order_items", script);
+        Assert.Contains("CREATE TABLE IF NOT EXISTS domain_events", script);
+    }
+
+    [Fact]
+    public void CreateTablesScript_ContainsExpectedIndexes()
+    {
+        // Arrange
+        string script = PostgreSqlSchema.CreateTablesScript;
+
+        // Act & Assert
+        Assert.Contains("CREATE INDEX IF NOT EXISTS idx_orders_customer_id", script);
+        Assert.Contains("CREATE INDEX IF NOT EXISTS idx_orders_order_date", script);
+        Assert.Contains("CREATE INDEX IF NOT EXISTS idx_order_items_order_id", script);
+        Assert.Contains("CREATE INDEX IF NOT EXISTS idx_domain_events_processed", script);
+        Assert.Contains("CREATE INDEX IF NOT EXISTS idx_domain_events_occurred_on", script);
+        Assert.Contains("CREATE INDEX IF NOT EXISTS idx_domain_events_aggregate_id", script);
+    }
+
+    [Fact]
+    public void CreateTablesScript_ContainsConstraints()
+    {
+        // Arrange
+        string script = PostgreSqlSchema.CreateTablesScript;
+
+        // Act & Assert
+        Assert.Contains("CHECK (quantity > 0)", script);
+        Assert.Contains("CHECK (price > 0)", script);
+        Assert.Contains("REFERENCES customers(id)", script);
+        Assert.Contains("REFERENCES orders(id)", script);
+        Assert.Contains("ON DELETE CASCADE", script);
+    }
+}
+
+// ========== POSTGRESQL INTEGRATION TESTS (Add new section) ==========
+
+public class PostgreSqlIntegrationTests : IDisposable
+{
+    private readonly string _connectionString;
+    private readonly bool _skipIntegrationTests;
+
+    public PostgreSqlIntegrationTests()
+    {
+        // Try to get connection string from environment or use test database
+        _connectionString = Environment.GetEnvironmentVariable("POSTGRESQL_TEST_CONNECTION_STRING")
+            ?? "Host=localhost;Database=customer_test;Username=test;Password=test";
+
+        // Skip if no PostgreSQL available
+        _skipIntegrationTests = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("POSTGRESQL_TEST_CONNECTION_STRING"));
+    }
+
+    public void Dispose()
+    {
+        if (!_skipIntegrationTests)
+        {
+            // Clean up test database
+            CleanupTestDatabase();
+        }
+    }
+
+    [Fact]
+    public async Task InitializeDatabaseAsync_CreatesTablesSuccessfully()
+    {
+        // Arrange
+        if (_skipIntegrationTests)
+        {
+            return; // Skip if no PostgreSQL available
+        }
+
+        // Act & Assert - Should not throw
+        await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
+    }
+
+    [Fact]
+    public async Task PostgreSqlRepository_SaveAndRetrieve_WorksCorrectly()
+    {
+        // Arrange
+        if (_skipIntegrationTests)
+        {
+            return; // Skip if no PostgreSQL available
+        }
+
+        await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
+
+        var logger = new MockLogger<PostgreSqlCustomerAggregateRepository>();
+        var repository = new PostgreSqlCustomerAggregateRepository(_connectionString, logger);
+
+        var businessRules = new CustomerBusinessRules();
+        var customerLogger = new MockLogger<CustomerAggregateRoot>();
+        var customer = new CustomerAggregateRoot(Guid.NewGuid(), "Integration Test Customer", businessRules, customerLogger);
+
+        var address = TestDataBuilder.CreateAddress();
+        customer.UpdateDefaultAddresses(address, address);
+
+        var order = customer.PlaceNewOrder();
+        var item = TestDataBuilder.CreateOrderItem("Integration Test Product", 2, 25.00m);
+        customer.AddItemToOrder(order.Id, item);
+
+        // Act
+        await repository.SaveAsync(customer);
+        var retrievedCustomer = await repository.GetByIdAsync(customer.Id);
+
+        // Assert
+        Assert.NotNull(retrievedCustomer);
+        Assert.Equal(customer.Id, retrievedCustomer.Id);
+        Assert.Equal(customer.Name, retrievedCustomer.Name);
+        Assert.Equal(customer.DefaultShippingAddress, retrievedCustomer.DefaultShippingAddress);
+        Assert.Equal(customer.DefaultBillingAddress, retrievedCustomer.DefaultBillingAddress);
+        Assert.Single(retrievedCustomer.Orders);
+        Assert.Single(retrievedCustomer.Orders[0].Items);
+        Assert.Equal(item.Product, retrievedCustomer.Orders[0].Items[0].Product);
+    }
+
+    [Fact]
+    public async Task PostgreSqlOutboxDispatcher_ProcessOutboxEventsAsync_WorksCorrectly()
+    {
+        // Arrange
+        if (_skipIntegrationTests)
+        {
+            return; // Skip if no PostgreSQL available
+        }
+
+        await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
+
+        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
+        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher(_connectionString, logger);
+
+        // Act - Should not throw
+        await dispatcher.ProcessOutboxEventsAsync();
+
+        // Assert
+        Assert.True(logger.ContainsMessage("Processing domain event") || logger.LogEntries.Count == 0);
+    }
+
+    [Fact]
+    public async Task PostgreSqlRepository_HandlesCancellation()
+    {
+        // Arrange
+        if (_skipIntegrationTests)
+        {
+            return; // Skip if no PostgreSQL available
+        }
+
+        await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
+
+        var logger = new MockLogger<PostgreSqlCustomerAggregateRepository>();
+        var repository = new PostgreSqlCustomerAggregateRepository(_connectionString, logger);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel(); // Cancel immediately
+
+        // Act & Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            repository.GetByIdAsync(Guid.NewGuid(), cts.Token));
+    }
+
+    private void CleanupTestDatabase()
+    {
+        try
+        {
+            using var connection = new Npgsql.NpgsqlConnection(_connectionString);
+            connection.Open();
+
+            const string cleanup = @"
+                DROP TABLE IF EXISTS domain_events CASCADE;
+                DROP TABLE IF EXISTS order_items CASCADE;
+                DROP TABLE IF EXISTS orders CASCADE;
+                DROP TABLE IF EXISTS customers CASCADE;
+            ";
+
+            using var command = new Npgsql.NpgsqlCommand(cleanup, connection);
+            command.ExecuteNonQuery();
+        }
+        catch
+        {
+            // Ignore cleanup errors
+        }
+    }
+}
+
+// ========== POSTGRESQL SERVICE REGISTRATION TESTS (Add new section) ==========
+
+public class PostgreSqlServiceRegistrationTests
+{
+    [Fact]
+    public void AddCustomerDomainWithPostgreSql_RegistersAllRequiredServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = CreateConfiguration();
+        const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
+
+        // Add required logging services
+        services.AddLogging();
+
+        // Act
+        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - Check all services are registered
+        Assert.NotNull(serviceProvider.GetService<CustomerBusinessRules>());
+        Assert.NotNull(serviceProvider.GetService<ICustomerAggregateRepository>());
+        Assert.NotNull(serviceProvider.GetService<IDomainEventDispatcher>());
+        Assert.NotNull(serviceProvider.GetService<CustomerApplicationService>());
+    }
+
+    [Fact]
+    public void AddCustomerDomainWithPostgreSql_RegistersPostgreSqlImplementations()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = CreateConfiguration();
+        const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
+        services.AddLogging();
+
+        // Act
+        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - Check correct implementations
+        var repository = serviceProvider.GetService<ICustomerAggregateRepository>();
+        Assert.IsType<PostgreSqlCustomerAggregateRepository>(repository);
+
+        var eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
+        Assert.IsType<PostgreSqlOutboxDomainEventDispatcher>(eventDispatcher);
+    }
+
+    [Fact]
+    public void AddCustomerDomainWithPostgreSql_RegistersSingletonServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = CreateConfiguration();
+        const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
+        services.AddLogging();
+
+        // Act
+        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - Verify singleton behavior
+        var businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
+        var businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
+        Assert.Same(businessRules1, businessRules2);
+
+        var repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        var repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        Assert.Same(repository1, repository2);
+
+        var dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
+        var dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
+        Assert.Same(dispatcher1, dispatcher2);
+    }
+
+    [Fact]
+    public void AddCustomerDomainWithPostgreSql_RegistersTransientApplicationService()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = CreateConfiguration();
+        const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
+        services.AddLogging();
+
+        // Act
+        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - Verify transient behavior
+        var service1 = serviceProvider.GetService<CustomerApplicationService>();
+        var service2 = serviceProvider.GetService<CustomerApplicationService>();
+        Assert.NotSame(service1, service2);
+    }
+
+    [Fact]
+    public void AddCustomerDomainWithPostgreSql_CanResolveAllDependencies()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = CreateConfiguration();
+        const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
+        services.AddLogging();
+
+        // Act
+        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - This will throw if any dependencies are missing
+        var applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
+        Assert.NotNull(applicationService);
+    }
+
+    private static IConfiguration CreateConfiguration()
+    {
+        var configValues = new Dictionary<string, string?>
+        {
+            {"CustomerBusinessRules:MaxOutstandingOrders", "10"},
+            {"CustomerBusinessRules:OutstandingOrderDays", "30"}
+        };
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(configValues)
+            .Build();
+    }
+}
+
+// ========== POSTGRESQL REPOSITORY UNIT TESTS (Add new section) ==========
+
+public class PostgreSqlRepositoryUnitTests
+{
+    [Fact]
+    public void PostgreSqlCustomerAggregateRepository_Constructor_NullConnectionString_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var logger = new MockLogger<PostgreSqlCustomerAggregateRepository>();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new PostgreSqlCustomerAggregateRepository(null!, logger));
+    }
+
+    [Fact]
+    public void PostgreSqlCustomerAggregateRepository_Constructor_NullLogger_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new PostgreSqlCustomerAggregateRepository("connection", null!));
+    }
+
+    [Fact]
+    public void PostgreSqlOutboxDomainEventDispatcher_Constructor_NullConnectionString_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new PostgreSqlOutboxDomainEventDispatcher(null!, logger));
+    }
+
+    [Fact]
+    public void PostgreSqlOutboxDomainEventDispatcher_Constructor_NullLogger_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new PostgreSqlOutboxDomainEventDispatcher("connection", null!));
+    }
+
+    [Fact]
+    public async Task PostgreSqlOutboxDomainEventDispatcher_DispatchAsync_LogsEvents()
+    {
+        // Arrange
+        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
+        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher("connection", logger);
+
+        var events = new[]
+        {
+            new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Test Customer")
+        };
+
+        // Act
+        await dispatcher.DispatchAsync(events);
+
+        // Assert
+        Assert.Single(logger.LogEntries);
+        Assert.True(logger.ContainsMessage("Domain event queued for processing"));
+        Assert.True(logger.ContainsMessage("CustomerCreatedEvent"));
+    }
+
+    [Fact]
+    public async Task PostgreSqlOutboxDomainEventDispatcher_DispatchAsync_EmptyEvents_DoesNotLog()
+    {
+        // Arrange
+        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
+        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher("connection", logger);
+        var events = Array.Empty<DomainEvent>();
+
+        // Act
+        await dispatcher.DispatchAsync(events);
+
+        // Assert
+        Assert.Empty(logger.LogEntries);
+    }
+
+    [Fact]
+    public async Task PostgreSqlOutboxDomainEventDispatcher_DispatchAsync_WithCancellationToken_CompletesSuccessfully()
+    {
+        // Arrange
+        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
+        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher("connection", logger);
+        using var cts = new CancellationTokenSource();
+
+        var events = new[]
+        {
+            new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Test Customer")
+        };
+
+        // Act
+        await dispatcher.DispatchAsync(events, cts.Token);
+
+        // Assert
+        Assert.Single(logger.LogEntries);
+    }
+}
+
+// ========== JSON SERIALIZATION TESTS (Add new section) ==========
+
+public class JsonSerializationTests
+{
+    [Fact]
+    public void Address_JsonSerialization_RoundTrip_WorksCorrectly()
+    {
+        // Arrange
+        var originalAddress = TestDataBuilder.CreateAddress();
+
+        // Act
+        string json = JsonSerializer.Serialize(originalAddress);
+        var deserializedAddress = JsonSerializer.Deserialize<Address>(json);
+
+        // Assert
+        Assert.NotNull(deserializedAddress);
+        Assert.Equal(originalAddress, deserializedAddress);
+    }
+
+    [Fact]
+    public void CustomerCreatedEvent_JsonSerialization_RoundTrip_WorksCorrectly()
+    {
+        // Arrange
+        var originalEvent = new CustomerCreatedEvent(
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            Guid.NewGuid(),
+            "Test Customer");
+
+        // Act
+        string json = JsonSerializer.Serialize(originalEvent);
+        var deserializedEvent = JsonSerializer.Deserialize<CustomerCreatedEvent>(json);
+
+        // Assert
+        Assert.NotNull(deserializedEvent);
+        Assert.Equal(originalEvent.Id, deserializedEvent.Id);
+        Assert.Equal(originalEvent.CustomerId, deserializedEvent.CustomerId);
+        Assert.Equal(originalEvent.CustomerName, deserializedEvent.CustomerName);
+    }
+
+    [Fact]
+    public void OrderItem_JsonSerialization_RoundTrip_WorksCorrectly()
+    {
+        // Arrange
+        var originalItem = TestDataBuilder.CreateOrderItem("Test Product", 3, 15.99m);
+
+        // Act
+        string json = JsonSerializer.Serialize(originalItem);
+        var deserializedItem = JsonSerializer.Deserialize<OrderItem>(json);
+
+        // Assert
+        Assert.NotNull(deserializedItem);
+        Assert.Equal(originalItem, deserializedItem);
+    }
+
+    [Fact]
+    public void DomainEvent_Polymorphic_JsonSerialization_WorksCorrectly()
+    {
+        // Arrange
+        var events = new DomainEvent[]
+        {
+            new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Customer 1"),
+            new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), Guid.NewGuid(),
+                DateTime.UtcNow, TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress())
+        };
+
+        // Act & Assert - Should not throw
+        foreach (var domainEvent in events)
+        {
+            string json = JsonSerializer.Serialize(domainEvent);
+            Assert.NotNull(json);
+            Assert.NotEmpty(json);
+        }
+    }
+}
