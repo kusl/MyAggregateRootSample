@@ -2016,12 +2016,12 @@ public class PostgreSqlEntityTests
     public void CustomerEntity_PropertiesSetCorrectly()
     {
         // Arrange
-        var entity = new CustomerEntity
+        CustomerEntity entity = new()
         {
             Id = Guid.NewGuid(),
             Name = "Test Customer",
-            DefaultShippingAddressJson = """{"Street":"123 Test St","City":"Test City","State":"TS","PostalCode":"12345","Country":"Test Country"}""",
-            DefaultBillingAddressJson = """{"Street":"456 Bill Ave","City":"Bill City","State":"BC","PostalCode":"54321","Country":"Bill Country"}""",
+            DefaultShippingAddressJson = /*lang=json,strict*/ """{"Street":"123 Test St","City":"Test City","State":"TS","PostalCode":"12345","Country":"Test Country"}""",
+            DefaultBillingAddressJson = /*lang=json,strict*/ """{"Street":"456 Bill Ave","City":"Bill City","State":"BC","PostalCode":"54321","Country":"Bill Country"}""",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -2037,13 +2037,13 @@ public class PostgreSqlEntityTests
     public void OrderEntity_PropertiesSetCorrectly()
     {
         // Arrange
-        var entity = new OrderEntity
+        OrderEntity entity = new()
         {
             Id = Guid.NewGuid(),
             CustomerId = Guid.NewGuid(),
             OrderDate = DateTime.UtcNow,
-            ShippingAddressJson = """{"Street":"123 Test St","City":"Test City","State":"TS","PostalCode":"12345","Country":"Test Country"}""",
-            BillingAddressJson = """{"Street":"456 Bill Ave","City":"Bill City","State":"BC","PostalCode":"54321","Country":"Bill Country"}""",
+            ShippingAddressJson = /*lang=json,strict*/ """{"Street":"123 Test St","City":"Test City","State":"TS","PostalCode":"12345","Country":"Test Country"}""",
+            BillingAddressJson = /*lang=json,strict*/ """{"Street":"456 Bill Ave","City":"Bill City","State":"BC","PostalCode":"54321","Country":"Bill Country"}""",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -2059,7 +2059,7 @@ public class PostgreSqlEntityTests
     public void OrderItemEntity_PropertiesSetCorrectly()
     {
         // Arrange
-        var entity = new OrderItemEntity
+        OrderItemEntity entity = new()
         {
             Id = Guid.NewGuid(),
             OrderId = Guid.NewGuid(),
@@ -2081,12 +2081,12 @@ public class PostgreSqlEntityTests
     public void DomainEventEntity_PropertiesSetCorrectly()
     {
         // Arrange
-        var entity = new DomainEventEntity
+        DomainEventEntity entity = new()
         {
             Id = Guid.NewGuid(),
             AggregateId = Guid.NewGuid(),
             EventType = "CustomerCreatedEvent",
-            EventData = """{"Id":"123","CustomerId":"456","CustomerName":"Test"}""",
+            EventData = /*lang=json,strict*/ """{"Id":"123","CustomerId":"456","CustomerName":"Test"}""",
             OccurredOn = DateTime.UtcNow,
             Processed = false
         };
@@ -2205,23 +2205,23 @@ public class PostgreSqlIntegrationTests : IDisposable
 
         await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
 
-        var logger = new MockLogger<PostgreSqlCustomerAggregateRepository>();
-        var repository = new PostgreSqlCustomerAggregateRepository(_connectionString, logger);
+        MockLogger<PostgreSqlCustomerAggregateRepository> logger = new();
+        PostgreSqlCustomerAggregateRepository repository = new(_connectionString, logger);
 
-        var businessRules = new CustomerBusinessRules();
-        var customerLogger = new MockLogger<CustomerAggregateRoot>();
-        var customer = new CustomerAggregateRoot(Guid.NewGuid(), "Integration Test Customer", businessRules, customerLogger);
+        CustomerBusinessRules businessRules = new();
+        MockLogger<CustomerAggregateRoot> customerLogger = new();
+        CustomerAggregateRoot customer = new(Guid.NewGuid(), "Integration Test Customer", businessRules, customerLogger);
 
-        var address = TestDataBuilder.CreateAddress();
+        Address address = TestDataBuilder.CreateAddress();
         customer.UpdateDefaultAddresses(address, address);
 
-        var order = customer.PlaceNewOrder();
-        var item = TestDataBuilder.CreateOrderItem("Integration Test Product", 2, 25.00m);
+        Order order = customer.PlaceNewOrder();
+        OrderItem item = TestDataBuilder.CreateOrderItem("Integration Test Product", 2, 25.00m);
         customer.AddItemToOrder(order.Id, item);
 
         // Act
         await repository.SaveAsync(customer);
-        var retrievedCustomer = await repository.GetByIdAsync(customer.Id);
+        CustomerAggregateRoot? retrievedCustomer = await repository.GetByIdAsync(customer.Id);
 
         // Assert
         Assert.NotNull(retrievedCustomer);
@@ -2229,8 +2229,8 @@ public class PostgreSqlIntegrationTests : IDisposable
         Assert.Equal(customer.Name, retrievedCustomer.Name);
         Assert.Equal(customer.DefaultShippingAddress, retrievedCustomer.DefaultShippingAddress);
         Assert.Equal(customer.DefaultBillingAddress, retrievedCustomer.DefaultBillingAddress);
-        Assert.Single(retrievedCustomer.Orders);
-        Assert.Single(retrievedCustomer.Orders[0].Items);
+        _ = Assert.Single(retrievedCustomer.Orders);
+        _ = Assert.Single(retrievedCustomer.Orders[0].Items);
         Assert.Equal(item.Product, retrievedCustomer.Orders[0].Items[0].Product);
     }
 
@@ -2245,8 +2245,8 @@ public class PostgreSqlIntegrationTests : IDisposable
 
         await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
 
-        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
-        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher(_connectionString, logger);
+        MockLogger<PostgreSqlOutboxDomainEventDispatcher> logger = new();
+        PostgreSqlOutboxDomainEventDispatcher dispatcher = new(_connectionString, logger);
 
         // Act - Should not throw
         await dispatcher.ProcessOutboxEventsAsync();
@@ -2266,14 +2266,14 @@ public class PostgreSqlIntegrationTests : IDisposable
 
         await PostgreSqlSchema.InitializeDatabaseAsync(_connectionString);
 
-        var logger = new MockLogger<PostgreSqlCustomerAggregateRepository>();
-        var repository = new PostgreSqlCustomerAggregateRepository(_connectionString, logger);
+        MockLogger<PostgreSqlCustomerAggregateRepository> logger = new();
+        PostgreSqlCustomerAggregateRepository repository = new(_connectionString, logger);
 
-        using var cts = new CancellationTokenSource();
+        using CancellationTokenSource cts = new();
         cts.Cancel(); // Cancel immediately
 
         // Act & Assert
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             repository.GetByIdAsync(Guid.NewGuid(), cts.Token));
     }
 
@@ -2281,7 +2281,7 @@ public class PostgreSqlIntegrationTests : IDisposable
     {
         try
         {
-            using var connection = new Npgsql.NpgsqlConnection(_connectionString);
+            using Npgsql.NpgsqlConnection connection = new(_connectionString);
             connection.Open();
 
             const string cleanup = @"
@@ -2291,8 +2291,8 @@ public class PostgreSqlIntegrationTests : IDisposable
                 DROP TABLE IF EXISTS customers CASCADE;
             ";
 
-            using var command = new Npgsql.NpgsqlCommand(cleanup, connection);
-            command.ExecuteNonQuery();
+            using Npgsql.NpgsqlCommand command = new(cleanup, connection);
+            _ = command.ExecuteNonQuery();
         }
         catch
         {
@@ -2309,16 +2309,16 @@ public class PostgreSqlServiceRegistrationTests
     public void AddCustomerDomainWithPostgreSql_RegistersAllRequiredServices()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
 
         // Add required logging services
-        services.AddLogging();
+        _ = services.AddLogging();
 
         // Act
-        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
-        var serviceProvider = services.BuildServiceProvider();
+        _ = services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Check all services are registered
         Assert.NotNull(serviceProvider.GetService<CustomerBusinessRules>());
@@ -2331,47 +2331,47 @@ public class PostgreSqlServiceRegistrationTests
     public void AddCustomerDomainWithPostgreSql_RegistersPostgreSqlImplementations()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
-        services.AddLogging();
+        _ = services.AddLogging();
 
         // Act
-        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
-        var serviceProvider = services.BuildServiceProvider();
+        _ = services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Check correct implementations
-        var repository = serviceProvider.GetService<ICustomerAggregateRepository>();
-        Assert.IsType<PostgreSqlCustomerAggregateRepository>(repository);
+        ICustomerAggregateRepository? repository = serviceProvider.GetService<ICustomerAggregateRepository>();
+        _ = Assert.IsType<PostgreSqlCustomerAggregateRepository>(repository);
 
-        var eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
-        Assert.IsType<PostgreSqlOutboxDomainEventDispatcher>(eventDispatcher);
+        IDomainEventDispatcher? eventDispatcher = serviceProvider.GetService<IDomainEventDispatcher>();
+        _ = Assert.IsType<PostgreSqlOutboxDomainEventDispatcher>(eventDispatcher);
     }
 
     [Fact]
     public void AddCustomerDomainWithPostgreSql_RegistersSingletonServices()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
-        services.AddLogging();
+        _ = services.AddLogging();
 
         // Act
-        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
-        var serviceProvider = services.BuildServiceProvider();
+        _ = services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Verify singleton behavior
-        var businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
-        var businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules1 = serviceProvider.GetService<CustomerBusinessRules>();
+        CustomerBusinessRules? businessRules2 = serviceProvider.GetService<CustomerBusinessRules>();
         Assert.Same(businessRules1, businessRules2);
 
-        var repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
-        var repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository1 = serviceProvider.GetService<ICustomerAggregateRepository>();
+        ICustomerAggregateRepository? repository2 = serviceProvider.GetService<ICustomerAggregateRepository>();
         Assert.Same(repository1, repository2);
 
-        var dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
-        var dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? dispatcher1 = serviceProvider.GetService<IDomainEventDispatcher>();
+        IDomainEventDispatcher? dispatcher2 = serviceProvider.GetService<IDomainEventDispatcher>();
         Assert.Same(dispatcher1, dispatcher2);
     }
 
@@ -2379,18 +2379,18 @@ public class PostgreSqlServiceRegistrationTests
     public void AddCustomerDomainWithPostgreSql_RegistersTransientApplicationService()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
-        services.AddLogging();
+        _ = services.AddLogging();
 
         // Act
-        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
-        var serviceProvider = services.BuildServiceProvider();
+        _ = services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - Verify transient behavior
-        var service1 = serviceProvider.GetService<CustomerApplicationService>();
-        var service2 = serviceProvider.GetService<CustomerApplicationService>();
+        CustomerApplicationService? service1 = serviceProvider.GetService<CustomerApplicationService>();
+        CustomerApplicationService? service2 = serviceProvider.GetService<CustomerApplicationService>();
         Assert.NotSame(service1, service2);
     }
 
@@ -2398,23 +2398,23 @@ public class PostgreSqlServiceRegistrationTests
     public void AddCustomerDomainWithPostgreSql_CanResolveAllDependencies()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var configuration = CreateConfiguration();
+        ServiceCollection services = new();
+        IConfiguration configuration = CreateConfiguration();
         const string connectionString = "Host=localhost;Database=test;Username=test;Password=test";
-        services.AddLogging();
+        _ = services.AddLogging();
 
         // Act
-        services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
-        var serviceProvider = services.BuildServiceProvider();
+        _ = services.AddCustomerDomainWithPostgreSql(configuration, connectionString);
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
 
         // Assert - This will throw if any dependencies are missing
-        var applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
+        CustomerApplicationService applicationService = serviceProvider.GetRequiredService<CustomerApplicationService>();
         Assert.NotNull(applicationService);
     }
 
     private static IConfiguration CreateConfiguration()
     {
-        var configValues = new Dictionary<string, string?>
+        Dictionary<string, string?> configValues = new()
         {
             {"CustomerBusinessRules:MaxOutstandingOrders", "10"},
             {"CustomerBusinessRules:OutstandingOrderDays", "30"}
@@ -2433,10 +2433,10 @@ public class PostgreSqlRepositoryUnitTests
     public void PostgreSqlCustomerAggregateRepository_Constructor_NullConnectionString_ThrowsArgumentNullException()
     {
         // Arrange
-        var logger = new MockLogger<PostgreSqlCustomerAggregateRepository>();
+        MockLogger<PostgreSqlCustomerAggregateRepository> logger = new();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
+        _ = Assert.Throws<ArgumentNullException>(() =>
             new PostgreSqlCustomerAggregateRepository(null!, logger));
     }
 
@@ -2444,7 +2444,7 @@ public class PostgreSqlRepositoryUnitTests
     public void PostgreSqlCustomerAggregateRepository_Constructor_NullLogger_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
+        _ = Assert.Throws<ArgumentNullException>(() =>
             new PostgreSqlCustomerAggregateRepository("connection", null!));
     }
 
@@ -2452,10 +2452,10 @@ public class PostgreSqlRepositoryUnitTests
     public void PostgreSqlOutboxDomainEventDispatcher_Constructor_NullConnectionString_ThrowsArgumentNullException()
     {
         // Arrange
-        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
+        MockLogger<PostgreSqlOutboxDomainEventDispatcher> logger = new();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
+        _ = Assert.Throws<ArgumentNullException>(() =>
             new PostgreSqlOutboxDomainEventDispatcher(null!, logger));
     }
 
@@ -2463,7 +2463,7 @@ public class PostgreSqlRepositoryUnitTests
     public void PostgreSqlOutboxDomainEventDispatcher_Constructor_NullLogger_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
+        _ = Assert.Throws<ArgumentNullException>(() =>
             new PostgreSqlOutboxDomainEventDispatcher("connection", null!));
     }
 
@@ -2471,19 +2471,19 @@ public class PostgreSqlRepositoryUnitTests
     public async Task PostgreSqlOutboxDomainEventDispatcher_DispatchAsync_LogsEvents()
     {
         // Arrange
-        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
-        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher("connection", logger);
+        MockLogger<PostgreSqlOutboxDomainEventDispatcher> logger = new();
+        PostgreSqlOutboxDomainEventDispatcher dispatcher = new("connection", logger);
 
-        var events = new[]
-        {
+        CustomerCreatedEvent[] events =
+        [
             new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Test Customer")
-        };
+        ];
 
         // Act
         await dispatcher.DispatchAsync(events);
 
         // Assert
-        Assert.Single(logger.LogEntries);
+        _ = Assert.Single(logger.LogEntries);
         Assert.True(logger.ContainsMessage("Domain event queued for processing"));
         Assert.True(logger.ContainsMessage("CustomerCreatedEvent"));
     }
@@ -2492,9 +2492,9 @@ public class PostgreSqlRepositoryUnitTests
     public async Task PostgreSqlOutboxDomainEventDispatcher_DispatchAsync_EmptyEvents_DoesNotLog()
     {
         // Arrange
-        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
-        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher("connection", logger);
-        var events = Array.Empty<DomainEvent>();
+        MockLogger<PostgreSqlOutboxDomainEventDispatcher> logger = new();
+        PostgreSqlOutboxDomainEventDispatcher dispatcher = new("connection", logger);
+        DomainEvent[] events = [];
 
         // Act
         await dispatcher.DispatchAsync(events);
@@ -2507,20 +2507,20 @@ public class PostgreSqlRepositoryUnitTests
     public async Task PostgreSqlOutboxDomainEventDispatcher_DispatchAsync_WithCancellationToken_CompletesSuccessfully()
     {
         // Arrange
-        var logger = new MockLogger<PostgreSqlOutboxDomainEventDispatcher>();
-        var dispatcher = new PostgreSqlOutboxDomainEventDispatcher("connection", logger);
-        using var cts = new CancellationTokenSource();
+        MockLogger<PostgreSqlOutboxDomainEventDispatcher> logger = new();
+        PostgreSqlOutboxDomainEventDispatcher dispatcher = new("connection", logger);
+        using CancellationTokenSource cts = new();
 
-        var events = new[]
-        {
+        CustomerCreatedEvent[] events =
+        [
             new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Test Customer")
-        };
+        ];
 
         // Act
         await dispatcher.DispatchAsync(events, cts.Token);
 
         // Assert
-        Assert.Single(logger.LogEntries);
+        _ = Assert.Single(logger.LogEntries);
     }
 }
 
@@ -2532,11 +2532,11 @@ public class JsonSerializationTests
     public void Address_JsonSerialization_RoundTrip_WorksCorrectly()
     {
         // Arrange
-        var originalAddress = TestDataBuilder.CreateAddress();
+        Address originalAddress = TestDataBuilder.CreateAddress();
 
         // Act
         string json = JsonSerializer.Serialize(originalAddress);
-        var deserializedAddress = JsonSerializer.Deserialize<Address>(json);
+        Address? deserializedAddress = JsonSerializer.Deserialize<Address>(json);
 
         // Assert
         Assert.NotNull(deserializedAddress);
@@ -2547,7 +2547,7 @@ public class JsonSerializationTests
     public void CustomerCreatedEvent_JsonSerialization_RoundTrip_WorksCorrectly()
     {
         // Arrange
-        var originalEvent = new CustomerCreatedEvent(
+        CustomerCreatedEvent originalEvent = new(
             Guid.NewGuid(),
             DateTime.UtcNow,
             Guid.NewGuid(),
@@ -2555,7 +2555,7 @@ public class JsonSerializationTests
 
         // Act
         string json = JsonSerializer.Serialize(originalEvent);
-        var deserializedEvent = JsonSerializer.Deserialize<CustomerCreatedEvent>(json);
+        CustomerCreatedEvent? deserializedEvent = JsonSerializer.Deserialize<CustomerCreatedEvent>(json);
 
         // Assert
         Assert.NotNull(deserializedEvent);
@@ -2568,11 +2568,11 @@ public class JsonSerializationTests
     public void OrderItem_JsonSerialization_RoundTrip_WorksCorrectly()
     {
         // Arrange
-        var originalItem = TestDataBuilder.CreateOrderItem("Test Product", 3, 15.99m);
+        OrderItem originalItem = TestDataBuilder.CreateOrderItem("Test Product", 3, 15.99m);
 
         // Act
         string json = JsonSerializer.Serialize(originalItem);
-        var deserializedItem = JsonSerializer.Deserialize<OrderItem>(json);
+        OrderItem? deserializedItem = JsonSerializer.Deserialize<OrderItem>(json);
 
         // Assert
         Assert.NotNull(deserializedItem);
@@ -2583,15 +2583,15 @@ public class JsonSerializationTests
     public void DomainEvent_Polymorphic_JsonSerialization_WorksCorrectly()
     {
         // Arrange
-        var events = new DomainEvent[]
-        {
+        DomainEvent[] events =
+        [
             new CustomerCreatedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Customer 1"),
             new OrderPlacedEvent(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), Guid.NewGuid(),
                 DateTime.UtcNow, TestDataBuilder.CreateAddress(), TestDataBuilder.CreateAddress())
-        };
+        ];
 
         // Act & Assert - Should not throw
-        foreach (var domainEvent in events)
+        foreach (DomainEvent domainEvent in events)
         {
             string json = JsonSerializer.Serialize(domainEvent);
             Assert.NotNull(json);
